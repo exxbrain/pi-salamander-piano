@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+configure)
+    if [ -d /run/systemd/system ] && systemctl cat piano-synth.service >/dev/null 2>&1; then
+        systemctl restart piano-synth.service || true
+        systemctl restart piano-fx.service || true
+    fi
+    ;;
+esac
+
+exit 0

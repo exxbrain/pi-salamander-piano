@@ -82,6 +82,29 @@ cd /root/pi
 пишет настройки в `/etc/piano-synth.conf` и включает две службы: `piano-synth` (FluidSynth) и `piano-fx` (мост).
 Загрузка банков занимает десятки секунд. Повторный запуск безопасен: конфигурация не затирается.
 
+## Установка пакетом .deb (вместо `install.sh`)
+
+Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
+
+```bash
+python3 scripts/build-deb.py --version 1.0.0                                # -> dist/piano-synth_1.0.0_all.deb
+python3 scripts/build-deb.py --version 1.0.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.0.0_all.deb
+scp -O dist/*.deb root@<IP-Pi>:/root/
+ssh root@<IP-Pi> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-soundfonts_1.0.0_all.deb"
+```
+
+- `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
+  зависимости (`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`), команда `piano-synth-install-banks`.
+  Если на Pi остались службы ручной установки (`fluidsynth-live`, `midi-autoconnect`), пакет их отключает.
+- `piano-synth-soundfonts` — банки (`piano.sf2`, `mech.sf2`) в `/opt/piano-synth/soundfonts`. Это сотни мегабайт; можно вместо
+  него копировать файлы и вызвать `sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 1.0]`.
+- Удаление: `apt remove piano-synth` (службы остановятся и отключатся), `apt purge` дополнительно удалит конфигурацию.
+
+Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
+(`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
+На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.0.0_all.deb && dpkg-deb --contents piano-synth_1.0.0_all.deb`.
+
 ## Питание (читать обязательно)
 
 Pi 3 очень чувствительна к питанию. Проверка:

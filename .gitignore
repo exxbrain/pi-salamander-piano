@@ -1,5 +1,7 @@
 # собранные банки и скачанный Salamander
 build/
+dist/
+*.deb
 *.sf2
 *.sfz
 *.tar.xz
