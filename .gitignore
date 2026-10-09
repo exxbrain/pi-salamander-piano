@@ -1,0 +1,8 @@
+# собранные банки и скачанный Salamander
+build/
+*.sf2
+*.sfz
+*.tar.xz
+*.wav
+__pycache__/
+.DS_Store

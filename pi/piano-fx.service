@@ -1,0 +1,14 @@
+[Unit]
+Description=Piano mechanics MIDI bridge (keyboards -> FluidSynth)
+After=piano-synth.service
+
+[Service]
+User=root
+EnvironmentFile=/etc/piano-synth.conf
+ExecStart=/usr/bin/python3 /opt/piano-synth/piano-fx.py $FX_ARGS
+Restart=always
+RestartSec=2
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target
