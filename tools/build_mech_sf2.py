@@ -12,6 +12,10 @@ Six presets in bank 0:
 Every instrument maps velocity linearly to attenuation: attenuation_dB = 60 * (1 - vel/127),
 so the companion program can request any attenuation 0..60 dB through the note velocity.
 Samples are stereo, split into L/R SF2 samples panned hard left/right.
+
+Usage: build_mech_sf2.py SRC_DIR OUT.sf2 [SFZ_NAME]
+Works with any package of the set (44.1 kHz/16 bit, 48 kHz/24 bit, WAV or FLAC): sample files are found through the
+paths in the SFZ and converted to 44.1 kHz / 16 bit.
 """
 import array
 import os
@@ -22,8 +26,8 @@ import sys
 
 SRC = sys.argv[1]
 OUT = sys.argv[2]
-SFZ = os.path.join(SRC, 'SalamanderGrandPianoV3Retuned.sfz')
-WAV = os.path.join(SRC, '44.1khz16bit')
+SFZ = os.path.join(SRC, sys.argv[3] if len(sys.argv) > 3 else 'SalamanderGrandPianoV3Retuned.sfz')
+SFZ_DIR = os.path.dirname(SFZ)   # sample paths in the SFZ are relative to it
 
 
 def parse():
@@ -33,18 +37,19 @@ def parse():
         if not line.startswith('<region>'):
             continue
         kv = dict(re.findall(r'(\w+)=(\S+)', line))
-        f = kv['sample'].replace('\\', '/').split('/')[-1]
-        if re.match(r'^rel\d+\.wav$', f):
+        relpath = kv['sample'].replace('\\', '/')
+        f = relpath.split('/')[-1]
+        if re.match(r'^rel\d+\.(?:wav|flac)$', f):
             k = int(kv['lokey'])
-            inst['Hammer'].append(dict(file=f, lo=k, hi=k, root=k, tune=0))
+            inst['Hammer'].append(dict(file=relpath, lo=k, hi=k, root=k, tune=0))
         elif f.startswith('harm'):
             name = {'harmL': 'ResL', 'harmS': 'ResS', 'harmV3': 'ResV3'}[re.match(r'^(harm(?:V3|L|S))', f).group(1)]
-            inst[name].append(dict(file=f, lo=int(kv['lokey']), hi=int(kv['hikey']),
+            inst[name].append(dict(file=relpath, lo=int(kv['lokey']), hi=int(kv['hikey']),
                                    root=int(kv.get('pitch_keycenter', 60)), tune=int(kv.get('tune', 0))))
         elif f.startswith('pedal'):
             name = 'PedalDn' if f.startswith('pedalD') else 'PedalUp'
-            key = 60 if f.endswith('1.wav') else 61
-            inst[name].append(dict(file=f, lo=key, hi=key, root=key, tune=0))
+            key = 60 if os.path.splitext(f)[0].endswith('1') else 61
+            inst[name].append(dict(file=relpath, lo=key, hi=key, root=key, tune=0))
     return inst
 
 
@@ -92,9 +97,9 @@ def main():
     for name, regs in inst.items():
         zones[name] = []
         for r in regs:
-            left, right = decode(os.path.join(WAV, r['file']))
+            left, right = decode(os.path.join(SFZ_DIR, *r['file'].split('/')))
             lid = len(shdr)
-            base = os.path.splitext(r['file'])[0][:16]
+            base = os.path.splitext(os.path.basename(r['file']))[0][:16]
             add(base + 'L', left, r['root'], 4, lid + 1)
             rid = add(base + 'R', right, r['root'], 2, lid)
             zones[name].append((r['lo'], r['hi'], r['tune'], -500, lid))

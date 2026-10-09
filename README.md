@@ -49,6 +49,27 @@ If you already have Salamander unpacked (a folder with `SalamanderGrandPianoV3Re
 
 Result: `build/mech.sf2` (36 MB) and `build/piano-<preset>.sf2`.
 
+#### Choosing the sample package (`-v`)
+
+Salamander is published by [FreePats](https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html) in several packages. The builders
+find the sample files through the paths written in the SFZ, and convert everything to 44.1 kHz / 16 bit, so the
+resulting banks have the same size whichever package you take; the source only changes how faithful the conversion is
+and how much you download.
+
+```bash
+scripts/make-soundfonts.sh -p standard -v 48k24 -o build     # take the 48 kHz / 24 bit WAV package
+```
+
+| `-v` | Package | Download | Status |
+|---|---|---|---|
+| `44k16` (default) | SFZ WAV, 44.1 kHz 16 bit | 412 MB | built and used on a real Pi |
+| `48k24` | SFZ WAV, 48 kHz 24 bit | 1.26 GB | checked on a copy of the `44k16` set converted to this format (the rendered audio matches the `44k16` build, difference 67 dB below the signal); the real 1.26 GB download was **not** tried |
+| `48k24-flac` | SFZ FLAC, 48 kHz 24 bit (2020-06-02 package) | 742 MB | **experimental**: the code path (FLAC, other folders) is tested on a synthetic set, but the real archive's layout and SFZ file name were not inspected; if the SFZ is not found, pass `-n NAME` |
+
+For any other Salamander SFZ package use `-u URL` (and `-n NAME` if its SFZ file is named differently). The layer
+table in the builder assumes the 16 velocity layers of the V3 set. FreePats also offers a ready-made SF2 of Salamander;
+it is not used here because it has no mechanics presets and no layer reduction.
+
 | Preset | Memory on the Pi | What it is | `GAIN` | Tested on a Pi 3 |
 |---|---|---|---|---|
 | `standard` | ~390 MB | 8 velocity layers, stereo, 11 s tails | 1.0 | yes, works |
@@ -172,8 +193,10 @@ SF2 has no such mechanism, so:
 python3 -m unittest discover -s tests -v
 ```
 
-They check the mechanics logic (`FXCore`) and the structure of the `.deb` packages without any hardware. The ALSA exchange
-and the SF2 building are not covered by tests: the build was checked by hand through FluidSynth, the ALSA exchange on a real Pi.
+They check the mechanics logic (`FXCore`), the structure of the `.deb` packages, and that the SF2 builders accept the
+different sample packages (44.1 kHz/16 bit and 48 kHz/24 bit, WAV and FLAC, different folder layouts; this part needs
+`ffmpeg` and is skipped without it). No hardware is needed. The ALSA exchange is not covered by tests (checked on a real Pi),
+and the audio quality of a built bank was checked by hand through FluidSynth.
 
 ## If something does not work
 

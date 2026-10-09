@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Build a reduced SF2 from the Salamander Grand Piano V3 SFZ set.
 
-Usage: build_piano_sf2.py SRC_DIR OUT.sf2 --layers 2,7,10,13,15 --tail 8 [--mono]
+Usage: build_piano_sf2.py SRC_DIR OUT.sf2 --layers 2,7,10,13,15 --tail 8 [--mono] [--rate 44100]
+
+Works with any package of the set (44.1 kHz/16 bit, 48 kHz/24 bit, WAV or FLAC): the sample files are located
+through the paths written in the SFZ, and everything is converted to --rate (default 44100) and 16 bit.
 
 Keeps only the chosen velocity layers, trims every sample to --tail seconds
 with a 2 s fade-out, optionally downmixes to mono, and writes a plain SF2
@@ -15,7 +18,7 @@ import struct
 import subprocess
 import sys
 
-NOTE_RE = re.compile(r'^([A-G]#?\d)v(\d+)\.wav$')
+NOTE_RE = re.compile(r'^([A-G]#?\d)v(\d+)\.(?:wav|flac)$')
 
 
 def parse_sfz(path):
@@ -35,13 +38,14 @@ def parse_sfz(path):
         if not line.startswith('<region>') or skip:
             continue
         kv = dict(re.findall(r'(\w+)=(\S+)', line))
-        fname = kv['sample'].replace('\\', '/').split('/')[-1]
+        relpath = kv['sample'].replace('\\', '/')
+        fname = relpath.split('/')[-1]
         m = NOTE_RE.match(fname)
         if not m:
             continue
         note, layer = m.group(1), int(m.group(2))
         notes.setdefault(note, {})[layer] = dict(
-            file=fname,
+            file=relpath,
             lokey=int(kv['lokey']),
             hikey=int(kv['hikey']),
             root=int(kv.get('pitch_keycenter', 60)),
@@ -77,8 +81,8 @@ def _filters(tail, dur, extra=None):
     return ['-af', ','.join(f)] if f else []
 
 
-def measure_peak(path, tail, mono, dur):
-    cmd = ['ffmpeg', '-v', 'info', '-i', path, '-t', str(tail)]
+def measure_peak(path, tail, mono, dur, rate=44100):
+    cmd = ['ffmpeg', '-v', 'info', '-i', path, '-t', str(tail), '-ar', str(rate)]
     if mono:
         cmd += ['-ac', '1']
     cmd += _filters(tail, dur, 'volumedetect') + ['-f', 'null', '-']
@@ -86,8 +90,8 @@ def measure_peak(path, tail, mono, dur):
     return float(re.search(r'max_volume: (-?[\d.]+) dB', out).group(1))
 
 
-def decode(path, tail, mono, dur, gain_db=0.0):
-    cmd = ['ffmpeg', '-v', 'error', '-i', path, '-t', str(tail)]
+def decode(path, tail, mono, dur, gain_db=0.0, rate=44100):
+    cmd = ['ffmpeg', '-v', 'error', '-i', path, '-t', str(tail), '-ar', str(rate)]
     if mono:
         cmd += ['-ac', '1']
     extra = 'volume=%.2fdB' % gain_db if abs(gain_db) > 0.01 else None
@@ -118,6 +122,7 @@ def main():
     ap.add_argument('--layers', required=True)
     ap.add_argument('--tail', type=float, default=8)
     ap.add_argument('--mono', action='store_true')
+    ap.add_argument('--rate', type=int, default=44100, help='output sample rate, Hz (sources are resampled)')
     ap.add_argument('--name', default='Salamander Grand Lite')
     ap.add_argument('--gamma', type=float, default=1.0)
     ap.add_argument('--peak-lo', type=float, default=None, help='target peak (dBFS) of softest chosen layer')
@@ -129,7 +134,8 @@ def main():
 
     chosen = [int(x) for x in args.layers.split(',')]
     notes = parse_sfz(os.path.join(args.src, args.sfz))
-    wavdir = os.path.join(args.src, '44.1khz16bit')
+    # sample paths in the SFZ are relative to the SFZ file itself
+    wavdir = os.path.dirname(os.path.join(args.src, args.sfz))
 
     # original velocity centers (from the 16-layer SFZ ranges)
     hivels = [26, 34, 36, 43, 46, 50, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127]
@@ -168,12 +174,12 @@ def main():
                 info = notes[note].get(layer)
                 if not info:
                     continue
-                path = os.path.join(wavdir, info['file'])
+                path = os.path.join(wavdir, *info['file'].split('/'))
                 d = float(subprocess.run(
                     ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path],
                     capture_output=True, text=True, check=True).stdout.strip())
                 durs[path] = d
-                peaks[(note, layer)] = measure_peak(path, args.tail, args.mono, d)
+                peaks[(note, layer)] = measure_peak(path, args.tail, args.mono, d, args.rate)
         for i, l in enumerate(ordered):
             frac = i / max(1, len(ordered) - 1)
             target = args.peak_lo + (args.peak_hi - args.peak_lo) * frac
@@ -189,17 +195,17 @@ def main():
             if not info:
                 print('missing', note, layer, file=sys.stderr)
                 continue
-            path = os.path.join(wavdir, info['file'])
+            path = os.path.join(wavdir, *info['file'].split('/'))
             dur = durs.get(path)
             if dur is None:
                 dur = float(subprocess.run(
                     ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path],
                     capture_output=True, text=True, check=True).stdout.strip())
-            raw = decode(path, args.tail, args.mono, dur, layer_gain[layer])
+            raw = decode(path, args.tail, args.mono, dur, layer_gain[layer], args.rate)
             key = (info['lokey'], info['hikey'])
             rel = info['release']
             if args.mono:
-                sid = add_sample('%sv%d' % (note, layer), raw, 44100, info['root'], 1, 0)
+                sid = add_sample('%sv%d' % (note, layer), raw, args.rate, info['root'], 1, 0)
                 zones.append((key, vel[layer], rel, info['tune'], 0, sid))
             else:
                 # de-interleave stereo
@@ -209,8 +215,8 @@ def main():
                     left += raw[i:i + 2]
                     right += raw[i + 2:i + 4]
                 lid = len(shdr)
-                add_sample('%sv%dL' % (note, layer), bytes(left), 44100, info['root'], 4, lid + 1)
-                rid = add_sample('%sv%dR' % (note, layer), bytes(right), 44100, info['root'], 2, lid)
+                add_sample('%sv%dL' % (note, layer), bytes(left), args.rate, info['root'], 4, lid + 1)
+                rid = add_sample('%sv%dR' % (note, layer), bytes(right), args.rate, info['root'], 2, lid)
                 zones.append((key, vel[layer], rel, info['tune'], -500, lid))
                 zones.append((key, vel[layer], rel, info['tune'], 500, rid))
         print('.', end='', flush=True)
