@@ -1,10 +1,10 @@
 #!/bin/bash
-# Установка фортепиано на Raspberry Pi (DietPi / Raspberry Pi OS Lite / Debian). Запускать от root.
+# Install the piano on a Raspberry Pi (DietPi / Raspberry Pi OS Lite / Debian). Run as root.
 #
-#   sudo ./install.sh --piano /путь/piano-standard.sf2 --mech /путь/mech.sf2 [--device plughw:Headphones] [--gain 1.0]
+#   sudo ./install.sh --piano /path/piano-standard.sf2 --mech /path/mech.sf2 [--device plughw:Headphones] [--gain 1.0]
 #
-# Повторный запуск безопасен: /etc/piano-synth.conf не перезаписывается,
-# меняются только те значения, которые вы указали флагами.
+# Safe to run again: /etc/piano-synth.conf is never overwritten,
+# only the values you pass as flags are changed.
 set -euo pipefail
 
 PREFIX=/opt/piano-synth
@@ -21,28 +21,28 @@ while [ $# -gt 0 ]; do
     --device) DEVICE="$2"; shift 2 ;;
     --gain)   GAIN="$2";  shift 2 ;;
     -h|--help) usage 0 ;;
-    *) echo "Неизвестный параметр: $1"; usage 1 ;;
+    *) echo "Unknown option: $1"; usage 1 ;;
   esac
 done
 
-[ "$(id -u)" = 0 ] || { echo "Запустите от root: sudo $0 ..."; exit 1; }
-if [ -n "$PIANO" ] && [ ! -f "$PIANO" ]; then echo "Нет файла: $PIANO"; exit 1; fi
-if [ -n "$MECH" ] && [ ! -f "$MECH" ]; then echo "Нет файла: $MECH"; exit 1; fi
+[ "$(id -u)" = 0 ] || { echo "Run as root: sudo $0 ..."; exit 1; }
+if [ -n "$PIANO" ] && [ ! -f "$PIANO" ]; then echo "No such file: $PIANO"; exit 1; fi
+if [ -n "$MECH" ] && [ ! -f "$MECH" ]; then echo "No such file: $MECH"; exit 1; fi
 if [ ! -f "$CONF" ] && { [ -z "$PIANO" ] || [ -z "$MECH" ]; }; then
-  echo "При первой установке нужны оба параметра: --piano и --mech"; usage 1
+  echo "The first installation needs both --piano and --mech"; usage 1
 fi
 
-echo "==> Пакеты"
+echo "==> Packages"
 apt-get update -qq
 apt-get install -y fluidsynth alsa-utils python3-mido python3-rtmidi
 
-echo "==> Файлы в $PREFIX"
+echo "==> Files in $PREFIX"
 install -d "$PREFIX/soundfonts"
 install -m 755 "$HERE/piano-fx.py" "$PREFIX/piano-fx.py"
 [ -n "$PIANO" ] && install -m 644 "$PIANO" "$PREFIX/soundfonts/piano.sf2"
 [ -n "$MECH" ]  && install -m 644 "$MECH"  "$PREFIX/soundfonts/mech.sf2"
 
-echo "==> Конфигурация $CONF"
+echo "==> Configuration $CONF"
 [ -f "$CONF" ] || install -m 644 "$HERE/piano-synth.conf" "$CONF"
 set_conf() {  # KEY VALUE
   if grep -q "^$1=" "$CONF"; then sed -i "s|^$1=.*|$1=$2|" "$CONF"; else echo "$1=$2" >> "$CONF"; fi
@@ -52,8 +52,8 @@ set_conf() {  # KEY VALUE
 [ -n "$DEVICE" ] && set_conf ALSA_DEVICE "$DEVICE"
 [ -n "$GAIN" ]   && set_conf GAIN "$GAIN"
 
-echo "==> Службы systemd"
-# старые названия из ручных установок: освободить звуковую карту и MIDI
+echo "==> systemd services"
+# services of earlier manual setups: free the sound card and the MIDI ports
 for old in fluidsynth-live midi-autoconnect; do
   if systemctl list-unit-files "$old.service" 2>/dev/null | grep -q "$old"; then
     systemctl disable --now "$old" 2>/dev/null || true
@@ -68,18 +68,18 @@ systemctl restart piano-synth
 sleep 2
 systemctl restart piano-fx
 
-echo "==> Проверка"
+echo "==> Checks"
 if grep -q '^ALSA_DEVICE=.*Headphones' "$CONF" && ! aplay -l 2>/dev/null | grep -qi headphones; then
-  echo "ВНИМАНИЕ: звуковая карта Headphones не найдена. Включите штатный звук:"
-  echo "  dtparam=audio=on в /boot/config.txt (в DietPi: dietpi-config -> Audio Options), затем reboot."
+  echo "WARNING: sound card 'Headphones' not found. Enable the onboard audio:"
+  echo "  dtparam=audio=on in /boot/config.txt (DietPi: dietpi-config -> Audio Options), then reboot."
 fi
 if command -v vcgencmd >/dev/null; then
   thr="$(vcgencmd get_throttled | cut -d= -f2)"
   echo "vcgencmd get_throttled = $thr"
-  [ "$thr" = "0x0" ] || echo "ВНИМАНИЕ: питание недостаточно (должно быть 0x0). См. README, раздел «Питание»."
+  [ "$thr" = "0x0" ] || echo "WARNING: insufficient power supply (should be 0x0). See the README, section 'Power supply'."
 fi
 echo
 systemctl --no-pager --lines=0 status piano-synth piano-fx || true
 echo
-echo "Готово. Загрузка банков занимает десятки секунд, потом клавиатура подключится сама."
-echo "Журнал:  journalctl -u piano-synth -u piano-fx -f"
+echo "Done. Loading the sound banks takes tens of seconds, then the keyboard connects by itself."
+echo "Log:  journalctl -u piano-synth -u piano-fx -f"

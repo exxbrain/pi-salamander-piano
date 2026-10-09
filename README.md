@@ -1,182 +1,186 @@
 # pi-salamander-piano
 
-Цифровое пианино на Raspberry Pi 3: **Salamander Grand Piano V3** (Yamaha C5) через FluidSynth плюс
-**механика рояля** — стук молоточков и демпферов, резонанс струн, стук педали, — которой в формате SF2
-нет, поэтому её добавляет небольшая программа-мост.
+English | [Русский](README.ru.md)
+
+A digital piano on a Raspberry Pi 3: **Salamander Grand Piano V3** (Yamaha C5) through FluidSynth, plus
+**piano mechanics** - hammer and damper noise, string resonance, pedal noise - which the SF2 format cannot
+express by itself, so a small bridge program adds them.
 
 ```
-USB MIDI-клавиатура ─► piano-fx.py ─► FluidSynth ─► звуковой выход
-                          │             ├─ piano.sf2  (рояль, канал 0)
-                          └─ механика ─►└─ mech.sf2   (каналы 1–6)
+USB MIDI keyboard ─► piano-fx.py ─► FluidSynth ─► audio output
+                        │             ├─ piano.sf2  (the piano, channel 0)
+                        └─ mechanics ─►└─ mech.sf2   (channels 1-6)
 ```
 
-Всё запускается само при включении Pi, клавиатуры подключаются автоматически: мост опрашивает MIDI-порты каждые 2 секунды.
-Подключение «на горячую» так предусмотрено, но на Pi проверялось только подключение при старте.
+Everything starts by itself when the Pi powers on, and keyboards connect automatically: the bridge rescans the MIDI
+ports every 2 seconds. Connecting a keyboard while the Pi is running is supported by design, but only connecting at boot
+was tested on a Pi.
 
-## Проверено на
+## Tested on
 
-- Raspberry Pi 3 Model B (1 ГБ), DietPi (Debian, FluidSynth 2.4.4), клавиатура Native Instruments KL Essential 49 mk3,
-  штатный выход 3.5 мм;
-- сборка банков — на macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
+- Raspberry Pi 3 Model B (1 GB), DietPi (Debian, FluidSynth 2.4.4), Native Instruments KL Essential 49 mk3 keyboard,
+  onboard 3.5 mm output;
+- building the banks: macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 
-На других платах, клавиатурах и звуковых картах не проверялось. USB-звуковую карту я рекомендую (см. «Задержка»),
-но с ней эта связка не измерялась.
+Other boards, keyboards and sound cards were not tested. I recommend a USB sound card (see "Audio output and latency"),
+but this setup was not measured with one.
 
-## Что понадобится
+## What you need
 
 | | |
 |---|---|
-| Pi 3 с DietPi или Raspberry Pi OS Lite | Wi-Fi для установки пакетов (`apt`) или Ethernet |
-| **Блок питания 5.1 В / 2.5 А и короткий кабель** | см. «Питание» — это не формальность |
-| USB MIDI-клавиатура | «class compliant», драйверы не нужны |
-| Mac или Linux для сборки банков | `python3`, `ffmpeg` (вместе с `ffprobe`), `curl`, `tar` с xz; ~2 ГБ места |
+| A Pi 3 with DietPi or Raspberry Pi OS Lite | Wi-Fi or Ethernet for installing packages (`apt`) |
+| **A 5.1 V / 2.5 A power supply and a short cable** | see "Power supply" - this is not a formality |
+| A USB MIDI keyboard | class-compliant, no drivers needed |
+| A Mac or Linux machine to build the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
 
-## Быстрый старт
+## Quick start
 
-### 1. Собрать звуковые банки (на Mac/Linux)
+### 1. Build the sound banks (on a Mac/Linux)
 
-Сами банки в репозитории не хранятся (сотни мегабайт, лицензия Salamander — CC-BY, см. [NOTICE.md](NOTICE.md)).
-Их делает скрипт из оригинального архива:
+The banks themselves are not stored in the repository (hundreds of megabytes, and Salamander's license is CC-BY, see
+[NOTICE.md](NOTICE.md)). A script makes them from the original archive:
 
 ```bash
-scripts/make-soundfonts.sh -p standard -o build      # скачает ~412 МБ и соберёт
+scripts/make-soundfonts.sh -p standard -o build      # downloads ~412 MB and builds
 ```
 
-Если Salamander у вас уже распакован (папка с `SalamanderGrandPianoV3Retuned.sfz`), укажите её: `-s /путь/к/папке`.
+If you already have Salamander unpacked (a folder with `SalamanderGrandPianoV3Retuned.sfz`), point to it: `-s /path/to/folder`.
 
-Результат: `build/mech.sf2` (36 МБ) и `build/piano-<пресет>.sf2`.
+Result: `build/mech.sf2` (36 MB) and `build/piano-<preset>.sf2`.
 
-| Пресет | Размер в RAM Pi | Что это | `GAIN` | Проверено на Pi 3 |
+| Preset | Memory on the Pi | What it is | `GAIN` | Tested on a Pi 3 |
 |---|---|---|---|---|
-| `standard` | ~390 МБ | 8 слоёв громкости, стерео, хвосты 11 с | 1.0 | да, работает |
-| `soft` | ~390 МБ | то же, но тихие ноты заметно тише (шире динамика) | 1.0 | нет, только на Mac |
-| `lite` | ~250 МБ | 6 слоёв, стерео, хвосты 9 с | 1.0 | близкий вариант (нагрузка CPU ~30%) |
-| `small` | ~135 МБ | 6 слоёв, **моно**, хвосты 10 с | 2.0 | нет, только на Mac |
+| `standard` | ~390 MB | 8 velocity layers, stereo, 11 s tails | 1.0 | yes, works |
+| `soft` | ~390 MB | same, but soft notes are noticeably quieter (wider dynamics) | 1.0 | no, only on the Mac |
+| `lite` | ~250 MB | 6 layers, stereo, 9 s tails | 1.0 | a close variant (CPU load ~30%) |
+| `small` | ~135 MB | 6 layers, **mono**, 10 s tails | 2.0 | no, only on the Mac |
 
-Файл целиком читается в оперативную память, а у Pi 3 её 1 ГБ. Свободную память после загрузки `standard` я точно не
-измерял; проверьте сами (`free -m`, столбец `available`). Если Pi не хватает памяти или процессора, берите `lite` или `small`.
+The whole file is read into RAM, and a Pi 3 has 1 GB. I did not measure the free memory after loading `standard`
+precisely; check yourself (`free -m`, the `available` column). If the Pi runs out of memory or CPU, use `lite` or `small`.
 
-### 2. Скопировать на Pi
+### 2. Copy to the Pi
 
-Лучше **по кабелю Ethernet** (по Wi-Fi большие файлы идут медленно, а на слабом питании связь обрывается).
-`scp` в DietPi требует флаг `-O` (там нет SFTP-сервера):
+Preferably **over Ethernet** (large files are slow over Wi-Fi, and with a weak power supply the connection drops).
+`scp` to DietPi needs the `-O` flag (there is no SFTP server):
 
 ```bash
-scp -O build/piano-standard.sf2 build/mech.sf2 root@<IP-Pi>:/root/
-scp -O -r pi root@<IP-Pi>:/root/
+scp -O build/piano-standard.sf2 build/mech.sf2 root@<Pi-IP>:/root/
+scp -O -r pi root@<Pi-IP>:/root/
 ```
 
-Если копирование рвётся, `rsync` умеет докачивать (на Pi: `apt install rsync`):
-`rsync -avP --partial -e ssh build/piano-standard.sf2 root@<IP-Pi>:/root/`.
+If the copy keeps breaking, `rsync` can resume (on the Pi: `apt install rsync`):
+`rsync -avP --partial -e ssh build/piano-standard.sf2 root@<Pi-IP>:/root/`.
 
-### 3. Установить (на Pi)
+### 3. Install (on the Pi)
 
 ```bash
-ssh root@<IP-Pi>
+ssh root@<Pi-IP>
 cd /root/pi
 ./install.sh --piano /root/piano-standard.sf2 --mech /root/mech.sf2 --gain 1.0
 ```
 
-Для USB-карты добавьте `--device hw:1` (номер карты из `aplay -l`). Скрипт ставит пакеты
-(`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`), раскладывает файлы в `/opt/piano-synth`,
-пишет настройки в `/etc/piano-synth.conf` и включает две службы: `piano-synth` (FluidSynth) и `piano-fx` (мост).
-Загрузка банков занимает десятки секунд. Повторный запуск безопасен: конфигурация не затирается.
+For a USB sound card add `--device hw:1` (the card number from `aplay -l`). The script installs the packages
+(`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`), puts the files in `/opt/piano-synth`,
+writes the settings to `/etc/piano-synth.conf` and enables two services: `piano-synth` (FluidSynth) and `piano-fx` (the bridge).
+Loading the banks takes tens of seconds. Running it again is safe: the configuration is not overwritten.
 
-## Установка пакетом .deb (вместо `install.sh`)
+## Installing as a .deb package (instead of `install.sh`)
 
-Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
+The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
 python3 scripts/build-deb.py --version 1.0.0                                # -> dist/piano-synth_1.0.0_all.deb
 python3 scripts/build-deb.py --version 1.0.0 --banks build/piano-standard.sf2 build/mech.sf2
                                                                             # + dist/piano-synth-soundfonts_1.0.0_all.deb
-scp -O dist/*.deb root@<IP-Pi>:/root/
-ssh root@<IP-Pi> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-soundfonts_1.0.0_all.deb"
+scp -O dist/*.deb root@<Pi-IP>:/root/
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-soundfonts_1.0.0_all.deb"
 ```
 
-- `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
-  зависимости (`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`), команда `piano-synth-install-banks`.
-  Если на Pi остались службы ручной установки (`fluidsynth-live`, `midi-autoconnect`), пакет их отключает.
-- `piano-synth-soundfonts` — банки (`piano.sf2`, `mech.sf2`) в `/opt/piano-synth/soundfonts`. Это сотни мегабайт; можно вместо
-  него копировать файлы и вызвать `sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 1.0]`.
-- Удаление: `apt remove piano-synth` (службы остановятся и отключатся), `apt purge` дополнительно удалит конфигурацию.
+- `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
+  dependencies (`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`) and the `piano-synth-install-banks` command.
+  If services of a manual setup (`fluidsynth-live`, `midi-autoconnect`) are left on the Pi, the package disables them.
+- `piano-synth-soundfonts` - the banks (`piano.sf2`, `mech.sf2`) in `/opt/piano-synth/soundfonts`. They are hundreds of
+  megabytes; instead you can copy the files and run
+  `sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 1.0]`.
+- Removal: `apt remove piano-synth` (the services stop and are disabled); `apt purge` also deletes the configuration.
 
-Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
-(`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
-На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.0.0_all.deb && dpkg-deb --contents piano-synth_1.0.0_all.deb`.
+The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
+(`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
+done. You can first inspect a package on the Pi:
+`dpkg-deb --info piano-synth_1.0.0_all.deb && dpkg-deb --contents piano-synth_1.0.0_all.deb`.
 
-## Питание (читать обязательно)
+## Power supply (read this)
 
-Pi 3 очень чувствительна к питанию. Проверка:
+The Pi 3 is very sensitive to its power. Check:
 
 ```bash
-vcgencmd get_throttled     # должно быть 0x0
+vcgencmd get_throttled     # must be 0x0
 ```
 
-Любое другое значение (например `0x50005`) означает, что напряжение просело. Последствия, которые мы наблюдали:
-щелчки в звуке, пропадающий Wi-Fi и обрыв SSH при копировании больших файлов, перезагрузки при отключении USB-устройств.
-Лечится **блоком 5.1 В / 2.5 А и коротким толстым кабелем** (до 1 м, сечение жил 20 AWG и толще, без выключателя).
-Длинный тонкий шнур — самая частая причина.
+Any other value (for example `0x50005`) means the voltage sagged. Effects we saw: clicks in the sound, Wi-Fi dropping
+and SSH breaking while copying large files, reboots when a USB device was unplugged. The cure is a **5.1 V / 2.5 A supply
+and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A long thin cord is the most common cause.
 
-## Звуковой выход и задержка
+## Audio output and latency
 
-- **Штатный 3.5 мм:** включить `dtparam=audio=on` в `/boot/config.txt` (DietPi: `dietpi-config` → Audio Options),
-  устройство `plughw:Headphones`. Драйвер bcm2835 сам увеличивает период буфера до 444 сэмплов, поэтому задержка
-  около 30 мс (при `PERIODS=3`); `PERIODS=2` даёт ~20 мс, но возможны щелчки. Выход шумноват.
-- **USB-звуковая карта:** лучшее решение. Устройство `hw:1`, `PERIOD_SIZE=64..128`, ожидаемая задержка в несколько раз ниже.
+- **Onboard 3.5 mm:** enable `dtparam=audio=on` in `/boot/config.txt` (DietPi: `dietpi-config` -> Audio Options), device
+  `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
+  30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The output is somewhat noisy.
+- **USB sound card:** the best option. Device `hw:1`, `PERIOD_SIZE=64..128`; the latency is expected to be several times lower.
 
-## Настройка
+## Configuration
 
-Всё в `/etc/piano-synth.conf`. После правки: `sudo systemctl restart piano-synth piano-fx`.
+Everything is in `/etc/piano-synth.conf`. After editing: `sudo systemctl restart piano-synth piano-fx`.
 
-| Параметр | Что делает |
+| Setting | What it does |
 |---|---|
-| `GAIN` | общая громкость (0.2 — значение FluidSynth по умолчанию, у этих банков 1.0; моно-пресет `small` — 2.0) |
-| `POLYPHONY` | число голосов; стерео — по два голоса на ноту, механика добавляет ещё |
-| `ALSA_DEVICE`, `PERIOD_SIZE`, `PERIODS` | звуковой выход и буфер |
-| `REVERB` | 1 — включить реверберацию FluidSynth (нагрузка на CPU выше) |
-| `FX_ARGS` | параметры механики, см. ниже |
+| `GAIN` | overall volume (0.2 is FluidSynth's own default; these banks want 1.0, the mono preset `small` wants 2.0) |
+| `POLYPHONY` | number of voices; stereo uses two voices per note, and the mechanics add more |
+| `ALSA_DEVICE`, `PERIOD_SIZE`, `PERIODS` | audio output and buffer |
+| `REVERB` | 1 enables FluidSynth's reverb (higher CPU load) |
+| `FX_ARGS` | mechanics options, see below |
 
-### Настройка механики (`FX_ARGS`)
+### Tuning the mechanics (`FX_ARGS`)
 
-| Параметр | По умолчанию | Смысл |
+| Option | Default | Meaning |
 |---|---|---|
-| `--hammer-boost ДБ` | 0 | громкость стука молоточков; 0 — как в SFZ (очень тихо), +6 заметно громче |
-| `--hammer-exp N` | 0.8 | зависимость стука от силы нажатия: амплитуда ~ (velocity/127)^N. Больше — тихая игра беззвучнее. 0.6–1.0 — мягко, 2.0 — резко |
-| `--random R` | 1.0 | случайность стука и педали: 0 — выключена, 1 — норма, 2 — сильная. Меняются громкость и (у молоточка) выбор сэмпла соседней клавиши |
-| `--res-boost ДБ` | 0 | громкость резонанса струн |
-| `--pedal-boost ДБ` | 0 | громкость стука педали |
+| `--hammer-boost DB` | 0 | hammer-noise level; 0 is as in the SFZ (very quiet), +6 is clearly louder |
+| `--hammer-exp N` | 0.8 | dependence of the knock on touch: amplitude ~ (velocity/127)^N. Larger = soft playing is more silent. 0.6-1.0 is gentle, 2.0 is steep |
+| `--random R` | 1.0 | randomness of knock and pedal: 0 off, 1 normal, 2 strong. Level varies, and for the hammer the sample of a neighbouring key is picked |
+| `--res-boost DB` | 0 | string-resonance level |
+| `--pedal-boost DB` | 0 | pedal-noise level |
 
-## Как это устроено
+## How it works
 
-В SFZ-оригинале механика запускается правилами `trigger=release` (отпустили клавишу) и `on_locc64` (педаль). У формата SF2
-такого механизма нет, поэтому:
+In the SFZ original the mechanics are triggered by `trigger=release` (a key is released) and `on_locc64` (the pedal) rules.
+SF2 has no such mechanism, so:
 
-- `tools/build_piano_sf2.py` собирает **рояль** без механики. Из 16 слоёв громкости оставляет несколько (вручную подобранных,
-  разнесённых по шкале velocity), обрезает хвосты с плавным затуханием, выравнивает уровни слоёв и добавляет мягкую
-  зависимость громкости от velocity. Кривая чувствительности (`--gamma`) сдвигает диапазоны так, что мягкое нажатие
-  попадает в более громкий слой;
-- `tools/build_mech_sf2.py` собирает **механику** как шесть отдельных пресетов (молоточки, резонанс L/S/V3, педаль вниз/вверх).
-  Громкость пресета задаётся через velocity ноты: затухание в дБ = 60·(1 − velocity/127);
-- `pi/piano-fx.py` читает клавиатуры, пересылает всё в FluidSynth на канале 0 и по отпусканию клавиши и педали сам
-  посылает «ноты» механики на каналы 1–6. Громкость считается по правилам SFZ (базовая громкость группы, `amp_veltrack`,
-  `rt_decay` — затухание за каждую секунду удержания клавиши). Если педаль нажата, резонанс струн откладывается до её отпускания.
+- `tools/build_piano_sf2.py` builds the **piano** without mechanics. Of the 16 velocity layers it keeps a few (chosen by hand,
+  spread over the velocity scale), shortens the tails with a smooth fade-out, matches the layer levels and adds a mild
+  dependence of volume on velocity. The sensitivity curve (`--gamma`) shifts the ranges so that a soft touch lands in a louder layer;
+- `tools/build_mech_sf2.py` builds the **mechanics** as six separate presets (hammer, resonance L/S/V3, pedal down/up).
+  A preset's volume is set through the note velocity: attenuation in dB = 60 * (1 - velocity/127);
+- `pi/piano-fx.py` reads the keyboards, forwards everything to FluidSynth on channel 0 and, when a key is released or the
+  pedal moves, sends the mechanics "notes" on channels 1-6. Levels follow the SFZ rules (the group's base volume,
+  `amp_veltrack`, `rt_decay` - attenuation per second the key was held). With the pedal down, the string resonance is
+  deferred until the pedal is released.
 
-## Тесты
+## Tests
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-Проверяют логику механики (`FXCore`) без оборудования. Сам обмен с ALSA и сборка SF2 в тестах не покрыты:
-сборка проверялась вручную через FluidSynth, обмен с ALSA — на реальной Pi.
+They check the mechanics logic (`FXCore`) and the structure of the `.deb` packages without any hardware. The ALSA exchange
+and the SF2 building are not covered by tests: the build was checked by hand through FluidSynth, the ALSA exchange on a real Pi.
 
-## Если что-то не работает
+## If something does not work
 
-См. [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
-## Лицензии
+## Licenses
 
-Скрипты репозитория — MIT ([LICENSE](LICENSE)). Звуки Salamander Grand Piano V3 — CC-BY, автор Alexander Holm
-([NOTICE.md](NOTICE.md)). Собранные из них файлы `.sf2` — производные работы, их распространение требует
-указания авторства.
+The repository's scripts are MIT ([LICENSE](LICENSE)). The Salamander Grand Piano V3 sounds are CC-BY, by Alexander Holm
+([NOTICE.md](NOTICE.md)). The `.sf2` files built from them are derivative works, and distributing them requires
+attribution.

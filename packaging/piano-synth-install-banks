@@ -1,5 +1,5 @@
 #!/bin/bash
-# Установка звуковых банков без пакета piano-synth-soundfonts (быстрее для файлов в сотни мегабайт).
+# Install the sound banks without the piano-synth-soundfonts package (faster for files of hundreds of megabytes).
 #
 #   sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 1.0]
 set -euo pipefail
@@ -17,13 +17,13 @@ while [ $# -gt 0 ]; do
     --device) DEVICE="$2"; shift 2 ;;
     --gain)   GAIN="$2";   shift 2 ;;
     -h|--help) usage 0 ;;
-    *) echo "Неизвестный параметр: $1"; usage 1 ;;
+    *) echo "Unknown option: $1"; usage 1 ;;
   esac
 done
 
-[ "$(id -u)" = 0 ] || { echo "Запустите от root (sudo)."; exit 1; }
-if [ -n "$PIANO" ] && [ ! -f "$PIANO" ]; then echo "Нет файла: $PIANO"; exit 1; fi
-if [ -n "$MECH" ] && [ ! -f "$MECH" ]; then echo "Нет файла: $MECH"; exit 1; fi
+[ "$(id -u)" = 0 ] || { echo "Run as root (sudo)."; exit 1; }
+if [ -n "$PIANO" ] && [ ! -f "$PIANO" ]; then echo "No such file: $PIANO"; exit 1; fi
+if [ -n "$MECH" ] && [ ! -f "$MECH" ]; then echo "No such file: $MECH"; exit 1; fi
 [ -n "$PIANO$MECH$DEVICE$GAIN" ] || usage 1
 
 set_conf() {  # KEY VALUE
@@ -38,7 +38,7 @@ if [ -n "$MECH" ];  then install -m 644 "$MECH"  "$DEST/mech.sf2";  set_conf MEC
 
 if [ -f "$DEST/piano.sf2" ] && [ -f "$DEST/mech.sf2" ]; then
   systemctl restart piano-synth piano-fx
-  echo "Готово. Загрузка банков занимает десятки секунд."
+  echo "Done. Loading the banks takes tens of seconds."
 else
-  echo "Сохранено. Для запуска нужны оба файла (piano.sf2 и mech.sf2)."
+  echo "Saved. Both files (piano.sf2 and mech.sf2) are needed to start."
 fi

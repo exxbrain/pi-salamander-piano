@@ -5,7 +5,7 @@ After=sound.target
 [Service]
 User=root
 EnvironmentFile=/etc/piano-synth.conf
-# -is = без интерактивной оболочки + режим сервера. Без -s FluidSynth сразу завершается.
+# -is = no interactive shell + server mode. Without -s FluidSynth exits right after loading.
 ExecStart=/usr/bin/fluidsynth -is -a alsa -m alsa_seq -o audio.alsa.device=${ALSA_DEVICE} -o audio.sample-format=16bits -r 44100 -z ${PERIOD_SIZE} -c ${PERIODS} -R ${REVERB} -C 0 -o synth.polyphony=${POLYPHONY} -g ${GAIN} ${PIANO_SF2} ${MECH_SF2}
 LimitRTPRIO=95
 LimitMEMLOCK=infinity

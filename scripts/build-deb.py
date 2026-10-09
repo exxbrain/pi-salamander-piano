@@ -180,7 +180,7 @@ def main():
             piano, mech = args.banks
             for p in (piano, mech):
                 if not os.path.isfile(p):
-                    sys.exit('Нет файла: ' + p)
+                    sys.exit('No such file: ' + p)
             bank_files = [('opt/piano-synth/soundfonts/piano.sf2', os.path.abspath(piano), 0o644),
                           ('opt/piano-synth/soundfonts/mech.sf2', os.path.abspath(mech), 0o644)]
             bank_desc = (

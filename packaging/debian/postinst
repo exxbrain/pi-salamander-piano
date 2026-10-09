@@ -4,7 +4,7 @@ set -e
 case "$1" in
 configure)
     if [ -d /run/systemd/system ]; then
-        # службы от ручных установок конфликтуют за звуковую карту и MIDI
+        # services of earlier manual setups compete for the sound card and the MIDI ports
         for old in fluidsynth-live midi-autoconnect; do
             if systemctl cat "$old.service" >/dev/null 2>&1; then
                 systemctl disable --now "$old.service" >/dev/null 2>&1 || true
@@ -16,8 +16,8 @@ configure)
             systemctl restart piano-synth.service
             systemctl restart piano-fx.service
         else
-            echo "piano-synth: звуковые банки ещё не установлены." >&2
-            echo "  Установите пакет piano-synth-soundfonts или выполните:" >&2
+            echo "piano-synth: the sound banks are not installed yet." >&2
+            echo "  Install the piano-synth-soundfonts package or run:" >&2
             echo "  sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2" >&2
         fi
     fi

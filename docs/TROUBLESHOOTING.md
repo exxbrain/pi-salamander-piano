@@ -1,57 +1,60 @@
-# Диагностика
+# Troubleshooting
 
-Все эти случаи реально встретились при разработке.
+English | [Русский](TROUBLESHOOTING.ru.md)
 
-## Статус служб и журналы
+All of these cases actually happened during development.
+
+## Service status and logs
 
 ```bash
 systemctl status piano-synth piano-fx
 journalctl -u piano-synth -n 30 --no-pager
 journalctl -u piano-fx -n 30 --no-pager
-aconnect -l          # клиент «FLUID Synth» должен быть, клавиатура подключена
+aconnect -l          # the "FLUID Synth" client must exist and the keyboard must be connected
 vcgencmd get_throttled
 free -m
 ```
 
-В журнале `piano-fx` должны быть строки `synth: FLUID Synth …` и `input: <ваша клавиатура> …`.
+The `piano-fx` log should contain lines like `synth: FLUID Synth ...` and `input: <your keyboard> ...`.
 
-## Нет звука
+## No sound
 
-| Симптом | Причина и решение |
+| Symptom | Cause and fix |
 |---|---|
-| `aplay -l` пишет «no soundcards found» | Штатный звук выключен: `dtparam=audio=on` в `/boot/config.txt` (DietPi: `dietpi-config` → Audio Options), `reboot` |
-| `piano-synth` постоянно перезапускается, счётчик рестартов растёт | FluidSynth запущен без `-s` и сразу выходит. В службе должно быть `-is` (в репозитории так и есть) |
-| В журнале `Out of memory`, процесс `Killed` | Банк не помещается в память. Пресет `lite` или `small` |
-| `aconnect -l` не показывает «FLUID Synth» | `piano-synth` не запущен или ещё грузит банки (десятки секунд после старта) |
-| Клавиатура играет, механики нет | Не загружен `mech.sf2` (проверьте `MECH_SF2` в `/etc/piano-synth.conf`) или не запущен `piano-fx` |
-| Звук есть, но очень тихий | Поднимите `GAIN` (для стерео 1.0, для моно `small` 2.0) и громкость ALSA (`alsamixer`, F6, Headphones ~90%) |
-| При аккордах хрип | `GAIN` слишком большой, уменьшите |
+| `aplay -l` says "no soundcards found" | Onboard audio is off: `dtparam=audio=on` in `/boot/config.txt` (DietPi: `dietpi-config` -> Audio Options), then `reboot` |
+| `piano-synth` restarts all the time, the restart counter keeps growing | FluidSynth was started without `-s` and exits at once. The service must use `-is` (it does in this repository) |
+| The log shows `Out of memory`, the process is `Killed` | The bank does not fit into memory. Use the `lite` or `small` preset |
+| `aconnect -l` does not show "FLUID Synth" | `piano-synth` is not running or is still loading the banks (tens of seconds after boot) |
+| The keyboard plays but there are no mechanics | `mech.sf2` is not loaded (check `MECH_SF2` in `/etc/piano-synth.conf`) or `piano-fx` is not running |
+| There is sound but it is very quiet | Raise `GAIN` (1.0 for stereo, 2.0 for the mono `small`) and the ALSA volume (`alsamixer`, F6, Headphones ~90%) |
+| Chords sound harsh or distorted | `GAIN` is too high, lower it |
 
-## Щелчки, задержка
+## Clicks and latency
 
-- Сначала `vcgencmd get_throttled`. Если не `0x0`, это питание, а не настройки (см. README).
-- Щелчки: увеличьте `PERIODS` до 3–4 (или `PERIOD_SIZE`).
-- Задержка: `PERIODS=2` на штатном выходе, лучше USB-карта.
-- Нагрузка: `htop` (поток `fluidsynth` у 100% — берите `lite`/`small`, уменьшите `POLYPHONY`, держите `REVERB=0`).
+- First check `vcgencmd get_throttled`. If it is not `0x0`, it is the power supply, not the settings (see the README).
+- Clicks: raise `PERIODS` to 3-4 (or `PERIOD_SIZE`).
+- Latency: `PERIODS=2` on the onboard output, or better a USB sound card.
+- Load: `htop` (if the `fluidsynth` thread sits at 100%, use `lite`/`small`, lower `POLYPHONY`, keep `REVERB=0`).
 
-## Сеть и SSH при установке
+## Network and SSH during installation
 
-| Симптом | Решение |
+| Symptom | Fix |
 |---|---|
-| `scp: /usr/lib/sftp-server: No such file or directory` | В DietPi нет SFTP-сервера: добавьте `-O` (`scp -O …`) |
-| `No route to host` в первую секунду, потом пинг идёт | Вероятно, Pi «просыпается» из энергосбережения Wi-Fi (первые пакеты теряются). Повторите; лучше Ethernet |
-| `REMOTE HOST IDENTIFICATION HAS CHANGED` | После переустановки системы изменился ключ: `ssh-keygen -R <IP>` |
-| `Permission denied` | Логин `root` (а не имя хоста), пароль по умолчанию в DietPi — `dietpi`, смените |
-| Связь пропадает при копировании больших файлов или при отключении USB-устройств | Просадка питания. Короткий кабель, блок 5.1 В / 2.5 А, Ethernet, не вынимайте USB при включённой Pi |
+| `scp: /usr/lib/sftp-server: No such file or directory` | DietPi has no SFTP server: add `-O` (`scp -O ...`) |
+| `No route to host` in the first second, then ping works | Probably the Pi is waking from Wi-Fi power saving (the first packets are lost). Try again; Ethernet is better |
+| `REMOTE HOST IDENTIFICATION HAS CHANGED` | The system was reinstalled and the key changed: `ssh-keygen -R <IP>` |
+| `Permission denied` | Log in as `root` (not the host name); DietPi's default password is `dietpi`, change it |
+| The connection drops while copying large files or when a USB device is unplugged | A power sag. Use a short cable and a 5.1 V / 2.5 A supply, use Ethernet, and do not unplug USB devices while the Pi is on |
 
-## Механика звучит не так
+## The mechanics sound wrong
 
-| Хочется | Параметр в `FX_ARGS` |
+| You want | Option in `FX_ARGS` |
 |---|---|
-| Стук молоточков тише или громче | `--hammer-boost` (дБ) |
-| Тихая игра без стука / со стуком | `--hammer-exp` больше / меньше |
-| Больше или меньше живости в стуке | `--random` |
-| Громче или тише педаль, резонанс | `--pedal-boost`, `--res-boost` |
+| Quieter or louder hammer knocks | `--hammer-boost` (dB) |
+| Soft playing without / with knocks | larger / smaller `--hammer-exp` |
+| More or less liveliness in the knock | `--random` |
+| Louder or quieter pedal and resonance | `--pedal-boost`, `--res-boost` |
 
-В записи молоточков (`rel*.wav`) звук нарастает не мгновенно: заметный уровень появляется через 23–81 мс от начала
-файла. Это свойство самих сэмплов, к задержке системы отношения не имеет. Сэмплы в сборке не обрезаются.
+In the hammer recordings (`rel*.wav`) the sound does not rise instantly: an audible level appears 23-81 ms after the
+start of the file. That is a property of the samples themselves and has nothing to do with the system's latency.
+The samples are not trimmed in the build.
