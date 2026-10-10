@@ -153,6 +153,27 @@ What is and is not verified: the installer script is tested by running it with f
 tested. The first-boot hook (`AUTO_SETUP_CUSTOM_SCRIPT_EXEC`) is written from DietPi's documentation and has not been tried on a real first
 boot. The GitHub workflow has not run yet: the first push shows whether it works (Actions tab).
 
+## Upgrading a running Pi
+
+```bash
+scripts/deploy-to-pi.sh 192.168.1.95        # or user@host; you type the SSH password once
+```
+
+It builds the package, sends it to the Pi and upgrades it there: it keeps `/etc/piano-synth.conf`, backs the old version up first, checks that
+the synthesizer and the bridge come back, and rolls back by itself if they do not (`deploy/upgrade-on-pi.sh`, by hand: `deploy/rollback-on-pi.sh`).
+The sound banks are not touched.
+
+## Where things live
+
+Everything is in this one folder. Git ignores the large generated parts, so they can never be committed (the pre-commit hook also refuses any
+staged file over 5 MB):
+
+| Folder | What | In git |
+|---|---|---|
+| `pi/`, `tools/`, `scripts/`, `deploy/`, `dietpi/`, `packaging/`, `tests/`, `docs/` | the program, builders, installers, tests | yes |
+| `build/` | built banks (`mech.sf2`, `piano-<preset>.sf2`), the downloaded Salamander in `build/salamander-44k16/`, older banks in `build/archive/` | no |
+| `dist/` | the `.deb` and the DietPi installer, rebuilt on every commit | no |
+
 ## Power supply (read this)
 
 The Pi 3 is very sensitive to its power. Check:

@@ -4,6 +4,15 @@
 # Skip it in an emergency with   git commit --no-verify
 set -e
 cd "$(git rev-parse --show-toplevel)"
+# Nothing big may be committed: sound banks, samples and archives belong to build/ and dist/, which git ignores.
+limit=$((5 * 1024 * 1024))
+while IFS= read -r f; do
+  size=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+  if [ "$size" -gt "$limit" ]; then
+    echo "pre-commit: $f is $((size / 1024 / 1024)) MB. Sound banks and archives must not be committed (see .gitignore)." >&2
+    exit 1
+  fi
+done < <(git diff --cached --name-only --diff-filter=AM)
 echo "pre-commit: running the tests"
 python3 -I -m unittest discover -s tests -q
 echo "pre-commit: building dist/ (package + DietPi installer)"
