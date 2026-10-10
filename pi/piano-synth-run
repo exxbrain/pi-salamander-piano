@@ -20,12 +20,18 @@ GAIN="${GAIN:-1.0}"
 REVERB="${REVERB:-0}"
 FLUIDSYNTH="${FLUIDSYNTH:-/usr/bin/fluidsynth}"
 
+# true if the card has a playback device (MIDI keyboards often show up as capture-only USB audio cards)
+has_playback() {
+  compgen -G "$ASOUND/card$1/pcm*p" >/dev/null
+}
+
 # prints "<card id> <usb|onboard|other>" for the best card, or nothing
 pick_card() {
   local usb="" onboard="" other="" num id
   [ -r "$ASOUND/cards" ] || return 0
   while read -r num id; do
     id="${id%% *}"
+    has_playback "$num" || continue
     if [ -e "$ASOUND/card$num/usbid" ]; then
       [ -n "$usb" ] || usb="$id"
     elif [[ "$id" == Headphones* ]]; then

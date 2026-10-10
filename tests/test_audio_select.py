@@ -14,18 +14,25 @@ HEADPHONES = (0, 'Headphones', 'bcm2835_headphon - bcm2835 Headphones', False)
 HDMI = (1, 'vc4hdmi', 'vc4-hdmi - vc4-hdmi', False)
 
 
-def usb(num, card_id, name='USB-Audio - Some card'):
-    return (num, card_id, name, True)
+def usb(num, card_id, name='USB-Audio - Some card', playback=True):
+    return (num, card_id, name, True, playback)
+
+
+def keyboard(num, card_id='mk3'):
+    """A MIDI keyboard that shows up as a capture-only USB audio card (seen on a real Pi)."""
+    return usb(num, card_id, 'USB-Audio - KL Essential 49 mk3', playback=False)
 
 
 class AudioSelectTests(unittest.TestCase):
     def run_script(self, cards, **env):
         with tempfile.TemporaryDirectory() as asound:
             lines = []
-            for num, card_id, desc, is_usb in cards:
+            for card in cards:
+                num, card_id, desc, is_usb = card[:4]
+                playback = card[4] if len(card) > 4 else True
                 lines.append('%2d [%-15s]: %s' % (num, card_id, desc))
                 lines.append('                      %s' % desc)
-                os.makedirs(os.path.join(asound, 'card%d' % num))
+                os.makedirs(os.path.join(asound, 'card%d' % num, 'pcm0p' if playback else 'pcm0c'))
                 if is_usb:
                     with open(os.path.join(asound, 'card%d' % num, 'usbid'), 'w') as f:
                         f.write('1686:0090\n')
@@ -74,6 +81,17 @@ class AudioSelectTests(unittest.TestCase):
         self.assertIn('synth.polyphony=64', r.stdout)
         self.assertIn('-R 1', r.stdout)
         self.assertTrue(r.stdout.strip().endswith('/p.sf2 /m.sf2'))
+
+    def test_usb_card_without_playback_is_ignored(self):
+        # regression: the keyboard's own USB audio card (capture only) was chosen instead of the jack
+        r = self.run_script([HEADPHONES, keyboard(1)])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('plughw:CARD=Headphones', r.stdout)
+        self.assertIn('-z 256 -c 3', r.stdout)
+
+    def test_interface_wins_over_keyboard_audio(self):
+        r = self.run_script([HEADPHONES, keyboard(1), usb(2, 'U24')])
+        self.assertIn('plughw:CARD=U24', r.stdout)
 
     def test_first_usb_card_wins(self):
         r = self.run_script([usb(1, 'First'), usb(2, 'Second')])
