@@ -122,7 +122,8 @@ class DebTests(unittest.TestCase):
         self.assertIn('EnvironmentFile=/etc/piano-synth.conf', synth)
         self.assertIn('ExecStart=/opt/piano-synth/piano-synth-run', synth)
         runner = data.extractfile('./opt/piano-synth/piano-synth-run').read().decode()
-        self.assertIn('-is ', runner)                       # server mode: FluidSynth must not exit by itself
+        self.assertIn('mkfifo', runner)                     # FluidSynth keeps running on a root-only pipe, no network port
+        self.assertNotIn('shell.port', runner)
         self.assertEqual(data.getmember('./opt/piano-synth/piano-synth-run').mode, 0o755)
         names = [m.name for m in data.getmembers()]
         self.assertIn('./lib/udev/rules.d/90-piano-synth.rules', names)

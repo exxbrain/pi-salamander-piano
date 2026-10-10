@@ -180,6 +180,50 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.actions.restarts, 0)
 
 
+class GainPipeTests(unittest.TestCase):
+    def test_set_gain_writes_the_command_into_the_pipe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fifo = os.path.join(tmp, 'cmd')
+            os.mkfifo(fifo, 0o600)
+            keep = os.open(fifo, os.O_RDWR)                       # plays the role of the running FluidSynth
+            old = os.environ.get('CMD_FIFO')
+            os.environ['CMD_FIFO'] = fifo
+            try:
+                self.assertTrue(web.Actions().set_gain(1.25))
+                self.assertEqual(os.read(keep, 100), b'set synth.gain 1.25\n')
+            finally:
+                os.close(keep)
+                if old is None:
+                    del os.environ['CMD_FIFO']
+                else:
+                    os.environ['CMD_FIFO'] = old
+
+    def test_set_gain_reports_failure_when_the_synth_is_not_running(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fifo = os.path.join(tmp, 'cmd')
+            os.mkfifo(fifo, 0o600)                                # nobody reads it
+            old = os.environ.get('CMD_FIFO')
+            os.environ['CMD_FIFO'] = fifo
+            try:
+                self.assertFalse(web.Actions().set_gain(1.25))
+            finally:
+                if old is None:
+                    del os.environ['CMD_FIFO']
+                else:
+                    os.environ['CMD_FIFO'] = old
+
+    def test_missing_pipe_is_a_failure_not_a_crash(self):
+        old = os.environ.get('CMD_FIFO')
+        os.environ['CMD_FIFO'] = '/nonexistent/cmd'
+        try:
+            self.assertFalse(web.Actions().set_gain(1.0))
+        finally:
+            if old is None:
+                del os.environ['CMD_FIFO']
+            else:
+                os.environ['CMD_FIFO'] = old
+
+
 class CardsTests(unittest.TestCase):
     def test_cards_skips_hdmi_and_capture_only_cards(self):
         with tempfile.TemporaryDirectory() as a:

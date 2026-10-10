@@ -7,8 +7,8 @@ StartLimitIntervalSec=0
 [Service]
 User=root
 EnvironmentFile=/etc/piano-synth.conf
-# The script picks the audio output (ALSA_DEVICE=auto) and starts FluidSynth with -is (no interactive shell + server
-# mode; without -s FluidSynth exits right after loading).
+# The script picks the audio output (ALSA_DEVICE=auto) and starts FluidSynth on a root-only pipe that keeps it running
+# and lets the web interface change the volume live (no network control port).
 ExecStart=/opt/piano-synth/piano-synth-run
 LimitRTPRIO=95
 LimitMEMLOCK=infinity

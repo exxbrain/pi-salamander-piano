@@ -5,6 +5,10 @@
 # Any other value is used as it is (for example plughw:U24). USB cards often accept only 24/32-bit audio or 4 channels,
 # so the automatic choice always goes through the "plughw" layer, which converts format, rate and channels.
 #
+# FluidSynth keeps running because its stdin is a root-only pipe (CMD_FIFO) that is never closed. The web interface writes
+# commands such as "set synth.gain 1.2" into it, so there is no network control port (FluidSynth's -s server mode listens on
+# every interface, and has no setting to change that).
+#
 # For tests: ASOUND_DIR points to a fake /proc/asound, DRY_RUN=1 prints the command instead of running it.
 set -euo pipefail
 
@@ -19,6 +23,7 @@ POLYPHONY="${POLYPHONY:-128}"
 GAIN="${GAIN:-1.0}"
 REVERB="${REVERB:-0}"
 FLUIDSYNTH="${FLUIDSYNTH:-/usr/bin/fluidsynth}"
+CMD_FIFO="${CMD_FIFO:-/run/piano-synth.cmd}"
 
 # true if the card has a playback device (MIDI keyboards often show up as capture-only USB audio cards)
 has_playback() {
@@ -67,10 +72,12 @@ if [ "$Z" -lt 64 ] || [ "$Z" -gt 8192 ]; then
   Z="$clamped"
 fi
 
-cmd=("$FLUIDSYNTH" -is -a alsa -m alsa_seq
+cmd=("$FLUIDSYNTH" -a alsa -m alsa_seq
      -o "audio.alsa.device=$DEVICE" -o audio.sample-format=16bits -r 44100
-     -o shell.address=127.0.0.1 -o shell.port=9800   # the web interface changes the gain live through this
      -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -g "$GAIN"
      "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "${cmd[*]}"; exit 0; fi
-exec "${cmd[@]}"
+rm -f "$CMD_FIFO"
+mkfifo -m 600 "$CMD_FIFO"
+exec 3<>"$CMD_FIFO"          # read+write: the pipe never reaches end-of-file, so FluidSynth keeps running
+exec "${cmd[@]}" <&3

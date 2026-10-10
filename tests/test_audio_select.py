@@ -76,7 +76,9 @@ class AudioSelectTests(unittest.TestCase):
 
     def test_banks_and_options_reach_fluidsynth(self):
         r = self.run_script([usb(1, 'U24')], GAIN='2.0', POLYPHONY=64, REVERB=1)
-        self.assertIn('-is ', r.stdout)                  # server mode: FluidSynth must not exit by itself
+        self.assertNotIn(' -s ', r.stdout)               # no server mode: its control port listens on every interface
+        self.assertNotIn(' -is ', r.stdout)
+        self.assertNotIn('shell.', r.stdout)
         self.assertIn('-g 2.0', r.stdout)
         self.assertIn('synth.polyphony=64', r.stdout)
         self.assertIn('-R 1', r.stdout)
@@ -107,6 +109,44 @@ class AudioSelectTests(unittest.TestCase):
     def test_first_usb_card_wins(self):
         r = self.run_script([usb(1, 'First'), usb(2, 'Second')])
         self.assertIn('plughw:CARD=First', r.stdout)
+
+
+class PipePlumbingTests(unittest.TestCase):
+    """FluidSynth must keep running on a root-only pipe, and commands written into the pipe must reach it."""
+
+    def test_fluidsynth_reads_its_stdin_from_the_pipe(self):
+        import stat
+        import time
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = os.path.join(tmp, 'fake-fluidsynth')
+            got = os.path.join(tmp, 'got.txt')
+            with open(fake, 'w') as f:
+                f.write('#!/bin/bash\nread -r line\necho "$line" > "%s"\n' % got)
+            os.chmod(fake, 0o755)
+            asound = os.path.join(tmp, 'asound')
+            os.makedirs(os.path.join(asound, 'card0', 'pcm0p'))
+            with open(os.path.join(asound, 'cards'), 'w') as f:
+                f.write(' 0 [Headphones     ]: bcm2835_headpho - bcm2835 Headphones\n')
+            fifo = os.path.join(tmp, 'cmd')
+            env = dict(os.environ, ASOUND_DIR=asound, USB_WAIT='0', PIANO_SF2='/p', MECH_SF2='/m',
+                       FLUIDSYNTH=fake, CMD_FIFO=fifo)
+            proc = subprocess.Popen(['bash', RUN], env=env, stderr=subprocess.DEVNULL)
+            try:
+                for _ in range(50):                              # wait for the pipe to appear
+                    if os.path.exists(fifo):
+                        break
+                    time.sleep(0.1)
+                self.assertTrue(stat.S_ISFIFO(os.stat(fifo).st_mode))
+                self.assertEqual(oct(os.stat(fifo).st_mode & 0o777), oct(0o600))       # root only
+                fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
+                os.write(fd, b'set synth.gain 1.2\n')
+                os.close(fd)
+                proc.wait(timeout=5)
+                with open(got) as f:
+                    self.assertEqual(f.read().strip(), 'set synth.gain 1.2')
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
 
 
 if __name__ == '__main__':

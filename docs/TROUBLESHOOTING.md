@@ -22,7 +22,7 @@ The `piano-fx` log should contain lines like `synth: FLUID Synth ...` and `input
 | Symptom | Cause and fix |
 |---|---|
 | `aplay -l` says "no soundcards found" | Onboard audio is off: `dtparam=audio=on` in `/boot/config.txt` (DietPi: `dietpi-config` -> Audio Options), then `reboot` |
-| `piano-synth` restarts all the time, the restart counter keeps growing | FluidSynth was started without `-s` and exits at once. The service must use `-is` (it does in this repository) |
+| `piano-synth` restarts all the time, the restart counter keeps growing | FluidSynth exits at once when its input is closed. Always start it through `/opt/piano-synth/piano-synth-run` (the service does): it keeps a root-only pipe open as FluidSynth's input. Do not use `-s` (server mode): that opens a control port on every network interface |
 | The log shows `Out of memory`, the process is `Killed` | The bank does not fit into memory. Use the `lite` or `small` preset |
 | `aconnect -l` does not show "FLUID Synth" | `piano-synth` is not running or is still loading the banks (tens of seconds after boot) |
 | The keyboard plays but there are no mechanics | `mech.sf2` is not loaded (check `MECH_SF2` in `/etc/piano-synth.conf`) or `piano-fx` is not running |

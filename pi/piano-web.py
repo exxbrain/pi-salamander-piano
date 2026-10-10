@@ -13,7 +13,6 @@ import hmac
 import json
 import os
 import re
-import socket
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -42,13 +41,20 @@ class Actions:
         subprocess.Popen(['systemctl', '--no-block', 'restart', 'piano-synth.service'])
 
     def set_gain(self, value):
-        """Live master gain through FluidSynth's TCP shell (server mode, localhost only). True on success."""
+        """Live master gain: write a shell command into the pipe FluidSynth reads (root-only, no network port).
+        True on success. (`set synth.gain` is the command that really changes it; plain `gain` does not.)"""
+        fifo = os.environ.get('CMD_FIFO', '/run/piano-synth.cmd')
         try:
-            with socket.create_connection(('127.0.0.1', 9800), timeout=2) as s:
-                s.sendall(('gain %s\nquit\n' % pianoconf._fmt(value)).encode('ascii'))
+            fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)      # fails with ENXIO when nobody reads (synth is down)
+        except OSError:
+            return False
+        try:
+            os.write(fd, ('set synth.gain %s\n' % pianoconf._fmt(float(value))).encode('ascii'))
             return True
         except OSError:
             return False
+        finally:
+            os.close(fd)
 
     def cards(self):
         """Sound cards that can play audio: [{id, name, usb}]."""

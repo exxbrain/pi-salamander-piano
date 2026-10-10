@@ -189,7 +189,7 @@ host name on DietPi is shown in your router). The page has:
 
 - **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
   another hardly ever passes 90. Move the slider while you play: the change is immediate.
-- **Volume** (changes at once, through FluidSynth's local control port) and the **mechanics** levels (applied within a second).
+- **Volume** (changes at once, through a root-only pipe: there is no network control port) and the **mechanics** levels (applied within a second).
 - **Audio output**: the output card, USB buffer, reverb and polyphony. These need a restart of the synthesizer (~45 s), so they are
   applied with a separate button.
 - the status of the services and of the chosen output.
