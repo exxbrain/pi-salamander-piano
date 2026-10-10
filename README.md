@@ -34,6 +34,23 @@ but this setup was not measured with one.
 | A USB MIDI keyboard | class-compliant, no drivers needed |
 | A Mac or Linux machine to build the banks | `python3`, `ffmpeg` (with `ffprobe`), `curl`, `tar` with xz; ~2 GB of free space |
 
+## Deployment in short (Raspberry Pi + DietPi)
+
+1. **Build the sound banks** once, on a Mac or Linux: `scripts/make-soundfonts.sh -p standard` (downloads ~412 MB; gives `build/piano-standard.sf2`
+   and `build/mech.sf2`).
+2. **Get the installer**: `dist/piano-synth-dietpi-<version>.zip` (made by the commit hook, or downloaded from the GitHub Actions artifact).
+3. **Install**, one of two ways:
+   - *New SD card:* flash DietPi, copy the contents of the zip's `boot-partition/` to the card's boot partition, put your banks into
+     `piano-synth/banks/` as `piano.sf2` and `mech.sf2`, set `AUTO_SETUP_AUTOMATED=1` and `AUTO_SETUP_CUSTOM_SCRIPT_EXEC=0` in `dietpi.txt`,
+     boot with an Ethernet cable and wait.
+   - *Pi that already runs DietPi:* copy the zip's `piano-synth/` folder to it and run `sudo bash piano-synth/install-piano.sh`.
+4. **Connect** the USB keyboard (and a USB audio interface, if you have one), then open `http://<address of the Pi>:8080/` to tune the touch,
+   volume, mechanics and output.
+5. **Check the power:** `vcgencmd get_throttled` must print `0x0`; anything else needs a better supply and a short cable (see "Power supply").
+
+Later updates: `scripts/deploy-to-pi.sh <address>`. Details of every step are below; what is tested and what is not is stated there too
+(notably, the automatic first-boot hook has not been tried on a real first boot).
+
 ## Quick start
 
 ### 1. Build the sound banks (on a Mac/Linux)
