@@ -93,6 +93,17 @@ class AudioSelectTests(unittest.TestCase):
         r = self.run_script([HEADPHONES, keyboard(1), usb(2, 'U24')])
         self.assertIn('plughw:CARD=U24', r.stdout)
 
+    def test_period_below_fluidsynth_minimum_is_clamped(self):
+        # regression: USB_PERIOD_SIZE=32 made FluidSynth exit ("audio.period-size out of range"), so no sound at all
+        r = self.run_script([usb(1, 'U24')], USB_PERIOD_SIZE=32)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('-z 64 -c 3', r.stdout)
+        self.assertIn('using 64', r.stderr)
+
+    def test_period_above_maximum_is_clamped(self):
+        r = self.run_script([HEADPHONES], PERIOD_SIZE=100000)
+        self.assertIn('-z 8192 ', r.stdout)
+
     def test_first_usb_card_wins(self):
         r = self.run_script([usb(1, 'First'), usb(2, 'Second')])
         self.assertIn('plughw:CARD=First', r.stdout)

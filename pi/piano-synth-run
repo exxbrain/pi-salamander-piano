@@ -60,6 +60,13 @@ if [ "$ALSA_DEVICE" = auto ]; then
   echo "piano-synth: audio output $DEVICE (${choice##* }), period $Z x $C" >&2
 fi
 
+# FluidSynth rejects periods outside 64..8192 and then exits at once (the service would restart forever)
+if [ "$Z" -lt 64 ] || [ "$Z" -gt 8192 ]; then
+  clamped=$(( Z < 64 ? 64 : 8192 ))
+  echo "piano-synth: period $Z is outside FluidSynth's range 64..8192, using $clamped" >&2
+  Z="$clamped"
+fi
+
 cmd=("$FLUIDSYNTH" -is -a alsa -m alsa_seq
      -o "audio.alsa.device=$DEVICE" -o audio.sample-format=16bits -r 44100
      -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -g "$GAIN"
