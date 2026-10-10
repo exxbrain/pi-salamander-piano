@@ -150,7 +150,7 @@ and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A lo
   `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
   30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The output is somewhat noisy.
 - **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
-  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (~12 ms). The device is opened through ALSA's `plughw` layer, which
+  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (64 frames = 1.45 ms per period, ~4.4 ms of buffering; the interface's own USB and converter delay come on top). The device is opened through ALSA's `plughw` layer, which
   matters: many interfaces accept only 24/32-bit audio or 4 channels, and opening them directly (`hw:`) fails with
   `Failed to find an audio format supported by alsa`.
   Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 with `64 x 3`: no clicks by ear, latency not
