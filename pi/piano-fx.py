@@ -17,6 +17,7 @@ Needs: python3-mido python3-rtmidi (apt).  Run:  piano-fx.py [--hammer-boost DB]
 import argparse
 import math
 import random
+import os
 import re
 import sys
 import threading
@@ -42,14 +43,39 @@ class FXCore:
     """Pure logic: feed it note/pedal events, it returns FX note-ons as (channel, note, velocity)."""
 
     def __init__(self, hammer_boost=10.0, res_boost=0.0, pedal_boost=0.0, rng=None, hammer_exp=2.0,
-                 randomness=1.0):
+                 randomness=1.0, velocity_curve=1.0):
         self.boost = {'hammer': hammer_boost, 'res': res_boost, 'pedal': pedal_boost}
         self.hammer_exp = hammer_exp
         self.randomness = randomness
+        self.velocity_curve = velocity_curve
         self.rng = rng or random.Random()
         self.held = {}        # note -> (t_on, vel)
         self.sustained = {}   # note -> (t_on, vel) released while the pedal was down
         self.pedal = False
+
+    def configure(self, hammer_boost=None, res_boost=None, pedal_boost=None, hammer_exp=None, randomness=None,
+                  velocity_curve=None):
+        """Change settings while running (None = keep)."""
+        if hammer_boost is not None:
+            self.boost['hammer'] = hammer_boost
+        if res_boost is not None:
+            self.boost['res'] = res_boost
+        if pedal_boost is not None:
+            self.boost['pedal'] = pedal_boost
+        if hammer_exp is not None:
+            self.hammer_exp = hammer_exp
+        if randomness is not None:
+            self.randomness = randomness
+        if velocity_curve is not None:
+            self.velocity_curve = velocity_curve
+
+    def map_velocity(self, vel):
+        """Touch curve: out = 127 * (in/127) ** curve. 1.0 = unchanged, < 1 = more sensitive (soft touches get louder),
+        > 1 = harder (needs a firmer touch)."""
+        g = self.velocity_curve
+        if g == 1.0:
+            return vel
+        return max(1, min(127, int(round(127.0 * (vel / 127.0) ** g))))
 
     @staticmethod
     def _vel(att_db):
@@ -152,7 +178,11 @@ SKIP_RE = re.compile(r'Through|DINTHRU|MCU|HUI|ALV|FLUID|Timer|Announce|System|R
 class Bridge:
     def __init__(self, core):
         import mido
+        import pianoconf
         self.mido = mido
+        self.pianoconf = pianoconf
+        self.conf_path = pianoconf.CONF_PATH
+        self.conf_mtime = None
         self.core = core
         self.lock = threading.Lock()
         self.out = None
@@ -182,6 +212,10 @@ class Bridge:
             return
         if hasattr(msg, 'channel') and msg.channel != 0:
             msg = msg.copy(channel=0)
+        if msg.type == 'note_on' and msg.velocity > 0:
+            mapped = self.core.map_velocity(msg.velocity)      # the touch curve: the piano and the mechanics both see it
+            if mapped != msg.velocity:
+                msg = msg.copy(velocity=mapped)
         now = time.monotonic()
         with self.lock:
             self.send(msg)    # the piano first: lowest latency
@@ -239,10 +273,34 @@ class Bridge:
                     pass
                 print('input gone:', name, flush=True)
 
+    def reload_settings(self):
+        """Re-read /etc/piano-synth.conf when it changed (the web interface writes it)."""
+        try:
+            mtime = os.stat(self.conf_path).st_mtime_ns
+        except OSError:
+            return
+        if mtime == self.conf_mtime:
+            return
+        first = self.conf_mtime is None
+        self.conf_mtime = mtime
+        s = self.pianoconf.get_settings(self.conf_path)
+        with self.lock:
+            self.core.configure(hammer_boost=s['hammer_boost'], res_boost=s['res_boost'],
+                                pedal_boost=s['pedal_boost'], hammer_exp=s['hammer_exp'],
+                                randomness=s['random'], velocity_curve=s['velocity_curve'])
+        if not first:
+            print('settings reloaded: curve %.2f, hammer %+.1f dB, exp %.2f, random %.1f, res %+.1f, pedal %+.1f' % (
+                s['velocity_curve'], s['hammer_boost'], s['hammer_exp'], s['random'], s['res_boost'], s['pedal_boost']),
+                flush=True)
+
     def run(self):
+        tick = 0
         while True:
-            self.scan()
-            time.sleep(2)
+            self.reload_settings()
+            if tick % 2 == 0:
+                self.scan()
+            tick += 1
+            time.sleep(1)
 
 
 def main():
@@ -254,9 +312,11 @@ def main():
                     help='hammer noise amplitude ~ (velocity/127)**EXP; larger = stronger dependence (default 2)')
     ap.add_argument('--random', type=float, default=1.0,
                     help='variation of knock/pedal level and sample choice: 0 = none, 1 = default, 2 = strong')
+    ap.add_argument('--velocity-curve', type=float, default=1.0,
+                    help='touch curve: out = 127*(in/127)**CURVE; 1 = unchanged, <1 more sensitive, >1 harder')
     args = ap.parse_args()
     core = FXCore(args.hammer_boost, args.res_boost, args.pedal_boost, hammer_exp=args.hammer_exp,
-                  randomness=args.random)
+                  randomness=args.random, velocity_curve=args.velocity_curve)
     Bridge(core).run()
 
 

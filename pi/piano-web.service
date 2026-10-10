@@ -1,0 +1,13 @@
+[Unit]
+Description=Piano module web interface
+After=piano-synth.service
+
+[Service]
+User=root
+EnvironmentFile=/etc/piano-synth.conf
+ExecStart=/usr/bin/python3 /opt/piano-synth/piano-web.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

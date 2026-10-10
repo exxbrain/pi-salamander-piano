@@ -180,6 +180,25 @@ Everything is in `/etc/piano-synth.conf`. After editing: `sudo systemctl restart
 | `--random R` | 1.0 | randomness of knock and pedal: 0 off, 1 normal, 2 strong. Level varies, and for the hammer the sample of a neighbouring key is picked |
 | `--res-boost DB` | 0 | string-resonance level |
 | `--pedal-boost DB` | 0 | pedal-noise level |
+| `--velocity-curve G` | 1.0 | touch curve for the whole piano: out = 127 * (in/127)^G. 1 = unchanged, below 1 soft touches sound louder, above 1 you must play harder |
+
+## Web interface
+
+Open `http://<device>:8080/` from a phone or a computer on the same network (the address is printed by `install.sh`; the default
+host name on DietPi is shown in your router). The page has:
+
+- **Touch**: the touch curve with a live graph. It matters because keyboards differ: one reaches velocity 127 with a moderate press,
+  another hardly ever passes 90. Move the slider while you play: the change is immediate.
+- **Volume** (changes at once, through FluidSynth's local control port) and the **mechanics** levels (applied within a second).
+- **Audio output**: the output card, USB buffer, reverb and polyphony. These need a restart of the synthesizer (~45 s), so they are
+  applied with a separate button.
+- the status of the services and of the chosen output.
+
+Everything is stored in `/etc/piano-synth.conf`, so the page and the file always agree. The page changes only the whitelisted
+settings, each within a fixed range. **There is no password by default**: anybody on your network can change these settings
+(nothing else, there is no shell access). Set `WEB_TOKEN=<secret>` in the config to require it, or `WEB_BIND=127.0.0.1` to
+reach the page only from the device itself. The service runs as root because it writes `/etc/piano-synth.conf` and restarts
+the synthesizer; hardening that is a task for a real product.
 
 ## How it works
 

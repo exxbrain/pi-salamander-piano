@@ -122,5 +122,82 @@ class RandomnessTests(unittest.TestCase):
         self.assertTrue(all(21 <= k <= 108 for k in keys))
 
 
+class VelocityCurveTests(unittest.TestCase):
+    def test_default_is_identity(self):
+        c = core()
+        self.assertEqual([c.map_velocity(v) for v in (1, 40, 90, 127)], [1, 40, 90, 127])
+
+    def test_curve_below_one_makes_soft_touches_louder(self):
+        c = core(velocity_curve=0.7)
+        self.assertGreater(c.map_velocity(30), 30)
+        self.assertEqual(c.map_velocity(127), 127)
+
+    def test_curve_above_one_needs_a_firmer_touch(self):
+        c = core(velocity_curve=1.5)
+        self.assertLess(c.map_velocity(60), 60)
+        self.assertEqual(c.map_velocity(127), 127)
+
+    def test_stays_in_midi_range_and_monotonic(self):
+        for g in (0.4, 0.8, 1.0, 1.6, 2.5):
+            c = core(velocity_curve=g)
+            out = [c.map_velocity(v) for v in range(1, 128)]
+            self.assertTrue(all(1 <= x <= 127 for x in out), g)
+            self.assertEqual(out, sorted(out), g)
+
+    def test_configure_changes_a_running_core(self):
+        c = core(hammer_boost=0)
+        c.configure(velocity_curve=0.5, hammer_boost=6, hammer_exp=1.0, randomness=0, res_boost=2, pedal_boost=3)
+        self.assertEqual(c.velocity_curve, 0.5)
+        self.assertEqual((c.boost['hammer'], c.boost['res'], c.boost['pedal']), (6, 2, 3))
+        c.configure()                                   # no arguments: nothing changes
+        self.assertEqual(c.velocity_curve, 0.5)
+
+
+class FakeMsg:
+    def __init__(self, type, **kw):
+        self.type = type
+        self.__dict__.update(kw)
+
+    def copy(self, **kw):
+        d = dict(self.__dict__)
+        d.update(kw)
+        return FakeMsg(**d)
+
+
+class BridgeMappingTests(unittest.TestCase):
+    """The bridge must apply the touch curve to what reaches the piano (and the mechanics see the same value)."""
+
+    def make_bridge(self, curve):
+        import sys
+        import types
+        fake_mido = types.ModuleType('mido')
+        fake_mido.Message = lambda t, **kw: FakeMsg(t, **kw)
+        sys.modules['mido'] = fake_mido
+        sys.path.insert(0, os.path.join(HERE, '..', 'pi'))
+        try:
+            b = fx.Bridge(core(velocity_curve=curve, hammer_boost=10))
+        finally:
+            sys.path.pop(0)
+            del sys.modules['mido']
+        b.sent = []
+        b.out = types.SimpleNamespace(send=b.sent.append)
+        return b
+
+    def test_note_on_velocity_is_mapped_before_sending(self):
+        b = self.make_bridge(0.5)
+        b.on_msg(FakeMsg('note_on', channel=3, note=60, velocity=32))
+        piano = [m for m in b.sent if m.channel == 0]
+        self.assertEqual(len(piano), 1)
+        self.assertEqual(piano[0].velocity, 64)          # 127 * (32/127) ** 0.5 = 63.7
+        self.assertEqual(b.core.held[60][1], 64)         # the mechanics use the mapped value too
+
+    def test_other_messages_are_not_touched(self):
+        b = self.make_bridge(0.5)
+        b.on_msg(FakeMsg('note_on', channel=0, note=60, velocity=0))     # a note-off written as velocity 0
+        b.on_msg(FakeMsg('control_change', channel=0, control=64, value=127))
+        self.assertEqual(b.sent[0].velocity, 0)
+        self.assertEqual(b.sent[1].value, 127)
+
+
 if __name__ == '__main__':
     unittest.main()

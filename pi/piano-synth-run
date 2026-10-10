@@ -69,6 +69,7 @@ fi
 
 cmd=("$FLUIDSYNTH" -is -a alsa -m alsa_seq
      -o "audio.alsa.device=$DEVICE" -o audio.sample-format=16bits -r 44100
+     -o shell.address=127.0.0.1 -o shell.port=9800   # the web interface changes the gain live through this
      -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -g "$GAIN"
      "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "${cmd[*]}"; exit 0; fi

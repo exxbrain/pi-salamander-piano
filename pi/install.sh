@@ -40,6 +40,10 @@ echo "==> Files in $PREFIX"
 install -d "$PREFIX/soundfonts"
 install -m 755 "$HERE/piano-fx.py" "$PREFIX/piano-fx.py"
 install -m 755 "$HERE/piano-synth-run" "$PREFIX/piano-synth-run"
+install -m 644 "$HERE/pianoconf.py" "$PREFIX/pianoconf.py"
+install -m 755 "$HERE/piano-web.py" "$PREFIX/piano-web.py"
+install -d "$PREFIX/web"
+install -m 644 "$HERE/web/index.html" "$PREFIX/web/index.html"
 [ -n "$PIANO" ] && install -m 644 "$PIANO" "$PREFIX/soundfonts/piano.sf2"
 [ -n "$MECH" ]  && install -m 644 "$MECH"  "$PREFIX/soundfonts/mech.sf2"
 
@@ -63,13 +67,15 @@ done
 pkill -x fluidsynth 2>/dev/null || true
 install -m 644 "$HERE/piano-synth.service" /etc/systemd/system/piano-synth.service
 install -m 644 "$HERE/piano-fx.service"    /etc/systemd/system/piano-fx.service
+install -m 644 "$HERE/piano-web.service"   /etc/systemd/system/piano-web.service
 install -m 644 "$HERE/90-piano-synth.rules" /etc/udev/rules.d/90-piano-synth.rules
 udevadm control --reload 2>/dev/null || true
 systemctl daemon-reload
-systemctl enable piano-synth piano-fx
+systemctl enable piano-synth piano-fx piano-web
 systemctl restart piano-synth
 sleep 2
 systemctl restart piano-fx
+systemctl restart piano-web
 
 echo "==> Checks"
 if grep -q '^ALSA_DEVICE=.*Headphones' "$CONF" && ! aplay -l 2>/dev/null | grep -qi headphones; then
@@ -85,4 +91,5 @@ echo
 systemctl --no-pager --lines=0 status piano-synth piano-fx || true
 echo
 echo "Done. Loading the sound banks takes tens of seconds, then the keyboard connects by itself."
-echo "Log:  journalctl -u piano-synth -u piano-fx -f"
+echo "Log:  journalctl -u piano-synth -u piano-fx -u piano-web -f"
+echo "Web interface: http://$(hostname -I | awk '{print $1}'):8080/"

@@ -12,10 +12,11 @@ configure)
             fi
         done
         systemctl daemon-reload
-        systemctl enable piano-synth.service piano-fx.service >/dev/null 2>&1 || true
+        systemctl enable piano-synth.service piano-fx.service piano-web.service >/dev/null 2>&1 || true
         if [ -f /opt/piano-synth/soundfonts/piano.sf2 ] && [ -f /opt/piano-synth/soundfonts/mech.sf2 ]; then
             systemctl restart piano-synth.service
             systemctl restart piano-fx.service
+            systemctl restart piano-web.service
         else
             echo "piano-synth: the sound banks are not installed yet." >&2
             echo "  Install the piano-synth-soundfonts package or run:" >&2

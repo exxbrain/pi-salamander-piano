@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano module</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1d2129; --muted: #667085; --line: #e3e6ec;
+    --accent: #2f6fed; --ok: #1a9e55; --bad: #d92d20; --warn: #b54708;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --card: #1e2127; --text: #e8eaee; --muted: #9aa3b2; --line: #2c3038;
+            --accent: #6d9bff; --ok: #3ccf82; --bad: #ff6b60; --warn: #f5a256; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.25rem; margin: 8px 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 1rem; margin: 0 0 4px; }
+  .hint { color: var(--muted); font-size: .88rem; margin: 0 0 8px; }
+  .row { display: grid; grid-template-columns: 1fr 64px; gap: 4px 12px; align-items: center; padding: 8px 0;
+         border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; }
+  .row label { grid-column: 1 / 3; font-weight: 600; font-size: .95rem; }
+  .row .small { grid-column: 1 / 3; color: var(--muted); font-size: .82rem; }
+  .row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select, input[type=number] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line);
+         background: var(--bg); color: var(--text); font-size: 1rem; }
+  button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; font-size: 1rem; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .92rem; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+  #msg { min-height: 1.4em; font-size: .9rem; }
+  #msg.err { color: var(--bad); } #msg.ok { color: var(--ok); } #msg.warn { color: var(--warn); }
+  canvas { width: 100%; max-width: 280px; height: auto; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+  .curve { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .curve > div { flex: 1; min-width: 220px; }
+  .check { display: flex; gap: 10px; align-items: center; padding: 8px 0; }
+  .check input { width: 20px; height: 20px; }
+  #login { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Piano module</h1>
+
+  <div class="card" id="login">
+    <h2 data-t="token_title">Access token</h2>
+    <p class="hint" data-t="token_hint">This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).</p>
+    <input type="password" id="token" autocomplete="off" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:1rem">
+    <p><button id="tokenBtn" data-t="token_btn">Sign in</button></p>
+  </div>
+
+  <div class="card">
+    <div class="status" id="status"></div>
+    <p id="msg" role="status"></p>
+  </div>
+
+  <div class="card">
+    <h2 data-t="touch">Touch</h2>
+    <p class="hint" data-t="touch_hint">How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.</p>
+    <div class="curve">
+      <div id="touchRows"></div>
+      <canvas id="curve" width="280" height="280"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-t="volume">Volume</h2>
+    <div id="volumeRows"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-t="mech">Piano mechanics</h2>
+    <p class="hint" data-t="mech_hint">Hammer, damper, string resonance and pedal noises. Changes apply within a second.</p>
+    <div id="mechRows"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-t="audio">Audio output</h2>
+    <p class="hint" data-t="audio_hint">These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).</p>
+    <div class="row"><label data-t="device">Output</label><select id="device" style="grid-column:1/3"></select></div>
+    <div class="row"><label data-t="usb_period">USB buffer (frames)</label><input type="number" id="usb_period_size" min="64" max="8192" step="64" style="grid-column:1/3"><span class="small" data-t="usb_period_hint">64 is the lowest FluidSynth accepts. Raise it if you hear clicks.</span></div>
+    <div class="row"><label data-t="usb_periods">USB buffers</label><input type="number" id="usb_periods" min="2" max="8" style="grid-column:1/3"></div>
+    <div class="check"><input type="checkbox" id="reverb"><label for="reverb" data-t="reverb">Reverb (more CPU load)</label></div>
+    <div class="row"><label data-t="polyphony">Polyphony (voices)</label><input type="number" id="polyphony" min="16" max="256" step="16" style="grid-column:1/3"></div>
+    <p><button id="applyRestart" data-t="apply_restart" disabled>Apply and restart synthesizer</button></p>
+  </div>
+</main>
+
+<script>
+"use strict";
+const T = {
+  en: {
+    title: "Piano module", touch: "Touch", touch_hint: "How the strength of a keypress turns into loudness. Adjust it to your keyboard; it takes effect immediately.",
+    volume: "Volume", mech: "Piano mechanics", mech_hint: "Hammer, damper, string resonance and pedal noises. Changes apply within a second.",
+    audio: "Audio output", audio_hint: "These changes need a restart of the synthesizer (about 45 seconds of silence while the banks load).",
+    device: "Output", usb_period: "USB buffer (frames)", usb_period_hint: "64 is the lowest FluidSynth accepts. Raise it if you hear clicks.",
+    usb_periods: "USB buffers", reverb: "Reverb (more CPU load)", polyphony: "Polyphony (voices)",
+    apply_restart: "Apply and restart synthesizer", token_title: "Access token", token_hint: "This module asks for a token (WEB_TOKEN in /etc/piano-synth.conf).", token_btn: "Sign in",
+    auto: "Automatic (USB card if present, otherwise the jack)", usb: "USB", onboard: "onboard",
+    synth: "Synthesizer", bridge: "Mechanics bridge", output: "Output", unknown: "unknown",
+    saved: "Saved", restart_needed: "Press \"Apply and restart\" for the audio changes.", restarting: "Restarting the synthesizer, about 45 seconds…",
+    gain_not_live: "Saved, but the live volume could not be changed (applies after a restart).", err: "Error", denied: "Wrong or missing token",
+    s_velocity_curve: ["Touch curve", "1 = unchanged · below 1: soft touches sound louder · above 1: you must play harder", ""],
+    s_gain: ["Master volume", "FluidSynth gain. Raise it if the module is too quiet, lower it if chords distort.", ""],
+    s_hammer_boost: ["Hammer noise level", "dB relative to the original recording (0 = as recorded, very quiet).", " dB"],
+    s_hammer_exp: ["Hammer noise vs. touch", "Larger = soft playing makes almost no noise. 0.6–1.0 is gentle.", ""],
+    s_random: ["Randomness", "0 = every knock identical, 1 = natural, 2 = lively.", ""],
+    s_res_boost: ["String resonance level", "dB relative to the original.", " dB"],
+    s_pedal_boost: ["Pedal noise level", "dB relative to the original.", " dB"],
+  },
+  ru: {
+    title: "Модуль пианино", touch: "Чувствительность", touch_hint: "Как сила нажатия превращается в громкость. Подберите под свою клавиатуру; действует сразу.",
+    volume: "Громкость", mech: "Механика рояля", mech_hint: "Стук молоточков и демпферов, резонанс струн, педаль. Изменения применяются за секунду.",
+    audio: "Звуковой выход", audio_hint: "Эти изменения требуют перезапуска синтезатора (около 45 секунд тишины, пока загружаются банки).",
+    device: "Выход", usb_period: "Буфер USB (кадры)", usb_period_hint: "64 — минимум, который принимает FluidSynth. Увеличьте, если слышны щелчки.",
+    usb_periods: "Число буферов USB", reverb: "Реверберация (больше нагрузка на процессор)", polyphony: "Полифония (голоса)",
+    apply_restart: "Применить и перезапустить синтезатор", token_title: "Ключ доступа", token_hint: "Модуль запрашивает ключ (WEB_TOKEN в /etc/piano-synth.conf).", token_btn: "Войти",
+    auto: "Автоматически (USB-карта, если есть, иначе штатный выход)", usb: "USB", onboard: "штатный",
+    synth: "Синтезатор", bridge: "Мост механики", output: "Выход", unknown: "неизвестно",
+    saved: "Сохранено", restart_needed: "Нажмите «Применить и перезапустить», чтобы изменения звука вступили в силу.", restarting: "Перезапуск синтезатора, около 45 секунд…",
+    gain_not_live: "Сохранено, но громкость «на лету» изменить не удалось (применится после перезапуска).", err: "Ошибка", denied: "Неверный или отсутствующий ключ",
+    s_velocity_curve: ["Кривая чувствительности", "1 = без изменений · меньше 1: тихие нажатия звучат громче · больше 1: надо играть сильнее", ""],
+    s_gain: ["Общая громкость", "Усиление FluidSynth. Увеличьте, если тихо, уменьшите, если аккорды хрипят.", ""],
+    s_hammer_boost: ["Громкость стука молоточков", "дБ относительно оригинальной записи (0 = как записано, очень тихо).", " дБ"],
+    s_hammer_exp: ["Стук молоточков и сила нажатия", "Больше = при тихой игре стука почти нет. 0.6–1.0 — мягко.", ""],
+    s_random: ["Случайность", "0 = каждый стук одинаковый, 1 = естественно, 2 = живее.", ""],
+    s_res_boost: ["Громкость резонанса струн", "дБ относительно оригинала.", " дБ"],
+    s_pedal_boost: ["Громкость стука педали", "дБ относительно оригинала.", " дБ"],
+  },
+};
+const L = (navigator.language || "en").toLowerCase().startsWith("ru") ? "ru" : "en";
+const tr = k => (T[L][k] !== undefined ? T[L][k] : T.en[k]);
+document.documentElement.lang = L;
+document.title = tr("title");
+document.getElementById("title").textContent = tr("title");
+document.querySelectorAll("[data-t]").forEach(el => { el.textContent = tr(el.dataset.t); });
+
+const $ = id => document.getElementById(id);
+const LIVE = {
+  touchRows: [["velocity_curve", 0.05]],
+  volumeRows: [["gain", 0.05]],
+  mechRows: [["hammer_boost", 0.5], ["hammer_exp", 0.1], ["random", 0.1], ["res_boost", 0.5], ["pedal_boost", 0.5]],
+};
+const SYNTH_KEYS = ["alsa_device", "usb_period_size", "usb_periods", "reverb", "polyphony"];
+let state = null, token = sessionStorage.getItem("pianoToken") || "";
+const timers = {};
+
+function api(path, body) {
+  const opt = { headers: { "X-Token": token } };
+  if (body !== undefined) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  return fetch(path, opt).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) { $("login").style.display = "block"; throw new Error(tr("denied")); }
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    return data;
+  });
+}
+function say(text, cls) { const m = $("msg"); m.textContent = text || ""; m.className = cls || ""; }
+
+function buildSliders() {
+  for (const [box, items] of Object.entries(LIVE)) {
+    for (const [name, step] of items) {
+      const [title, hint, unit] = tr("s_" + name);
+      const sp = state.spec[name];
+      const row = document.createElement("div"); row.className = "row";
+      const lab = document.createElement("label"); lab.textContent = title; lab.htmlFor = "r_" + name;
+      const inp = document.createElement("input"); inp.type = "range"; inp.id = "r_" + name;
+      inp.min = sp.lo; inp.max = sp.hi; inp.step = step; inp.value = state.settings[name];
+      const out = document.createElement("output"); out.id = "o_" + name;
+      const small = document.createElement("span"); small.className = "small"; small.textContent = hint;
+      const show = () => { out.textContent = (+inp.value).toFixed(2).replace(/\.?0+$/, "") + unit; };
+      show();
+      inp.addEventListener("input", () => {
+        show(); if (name === "velocity_curve") drawCurve(+inp.value);
+        clearTimeout(timers[name]);
+        timers[name] = setTimeout(() => save({ [name]: +inp.value }), 250);
+      });
+      row.append(lab, inp, out, small); $(box).append(row);
+    }
+  }
+}
+
+function drawCurve(g) {
+  const c = $("curve"), x = c.getContext("2d"), w = c.width, h = c.height, css = getComputedStyle(document.body);
+  x.clearRect(0, 0, w, h);
+  const pad = 26, s = w - 2 * pad;
+  x.strokeStyle = css.getPropertyValue("--line"); x.lineWidth = 1;
+  x.strokeRect(pad, pad, s, s);
+  x.setLineDash([4, 4]); x.beginPath(); x.moveTo(pad, pad + s); x.lineTo(pad + s, pad); x.stroke(); x.setLineDash([]);
+  x.strokeStyle = css.getPropertyValue("--accent"); x.lineWidth = 3; x.beginPath();
+  for (let v = 0; v <= 127; v++) {
+    const px = pad + (v / 127) * s, py = pad + s - Math.pow(v / 127, g) * s;
+    v ? x.lineTo(px, py) : x.moveTo(px, py);
+  }
+  x.stroke();
+  x.fillStyle = css.getPropertyValue("--muted"); x.font = "12px system-ui";
+  x.fillText(L === "ru" ? "нажатие →" : "touch →", pad, h - 6);
+  x.save(); x.translate(12, pad + s); x.rotate(-Math.PI / 2); x.fillText(L === "ru" ? "громкость →" : "loudness →", 0, 0); x.restore();
+}
+
+function fillAudio() {
+  const sel = $("device"); sel.textContent = "";
+  const opts = [["auto", tr("auto")]].concat((state.status.cards || []).map(c => ["plughw:CARD=" + c.id, c.name + " (" + (c.usb ? tr("usb") : tr("onboard")) + ")"]));
+  const cur = state.settings.alsa_device;
+  if (!opts.some(o => o[0] === cur)) opts.push([cur, cur]);
+  for (const [v, t] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.append(o); }
+  sel.value = cur;
+  $("usb_period_size").value = state.settings.usb_period_size;
+  $("usb_periods").value = state.settings.usb_periods;
+  $("reverb").checked = !!state.settings.reverb;
+  $("polyphony").value = state.settings.polyphony;
+}
+
+function renderStatus() {
+  const st = state.status, box = $("status"); box.textContent = "";
+  const item = (label, ok, text) => {
+    const d = document.createElement("span"); const dot = document.createElement("i");
+    dot.className = "dot " + (ok === true ? "ok" : ok === false ? "bad" : ""); d.append(dot, document.createTextNode(label + ": " + text)); box.append(d);
+  };
+  item(tr("synth"), st.synth === "active", st.synth); item(tr("bridge"), st.bridge === "active", st.bridge);
+  if (st.output) item(tr("output"), true, st.output.device + " · " + st.output.period + "×" + st.output.periods);
+  else item(tr("output"), null, tr("unknown"));
+}
+
+function dirty() {
+  const s = state.settings;
+  return $("device").value !== s.alsa_device || +$("usb_period_size").value !== s.usb_period_size ||
+    +$("usb_periods").value !== s.usb_periods || +$("reverb").checked !== s.reverb || +$("polyphony").value !== s.polyphony;
+}
+
+async function save(updates) {
+  try {
+    const r = await api("/api/settings", updates);
+    Object.assign(state.settings, r.settings);
+    if (updates.gain !== undefined && r.applied.gain === false) say(tr("gain_not_live"), "warn");
+    else say(r.restart_required ? tr("restart_needed") : tr("saved"), r.restart_required ? "warn" : "ok");
+    if (r.restart_required) $("applyRestart").disabled = false;
+  } catch (e) { say(tr("err") + ": " + e.message, "err"); }
+}
+
+async function applyRestart() {
+  try {
+    const u = { alsa_device: $("device").value, usb_period_size: +$("usb_period_size").value, usb_periods: +$("usb_periods").value,
+                reverb: $("reverb").checked ? 1 : 0, polyphony: +$("polyphony").value };
+    const r = await api("/api/settings", u); Object.assign(state.settings, r.settings);
+    await api("/api/restart", {});
+    $("applyRestart").disabled = true; say(tr("restarting"), "warn");
+  } catch (e) { say(tr("err") + ": " + e.message, "err"); }
+}
+
+async function refresh() {
+  try { const s = await api("/api/state"); state.status = s.status; renderStatus(); } catch (e) { /* the page keeps working */ }
+}
+
+async function start() {
+  try {
+    state = await api("/api/state");
+  } catch (e) { say(e.message, "err"); return; }
+  $("login").style.display = "none";
+  ["touchRows", "volumeRows", "mechRows"].forEach(id => { $(id).textContent = ""; });
+  buildSliders(); drawCurve(state.settings.velocity_curve); fillAudio(); renderStatus();
+  for (const id of ["device", "usb_period_size", "usb_periods", "reverb", "polyphony"]) {
+    $(id).addEventListener("input", () => { $("applyRestart").disabled = !dirty(); });
+  }
+  $("applyRestart").addEventListener("click", applyRestart);
+  setInterval(refresh, 3000);
+}
+$("tokenBtn").addEventListener("click", () => { token = $("token").value; sessionStorage.setItem("pianoToken", token); start(); });
+start();
+</script>
+</body>
+</html>
