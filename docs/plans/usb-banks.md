@@ -76,12 +76,20 @@ Valid and corrupt SF2 files (truncated, wrong magic, huge declared sizes), path 
 mount helper with fakes. On the hardware, by hand: FAT32 / exFAT / ext4, labels with spaces, pulling the drive during a copy, a too large bank,
 a bad bank, clicks while copying, reboot persistence.
 
-## Questions for the owner
+## Decisions (owner, 2026-10-10)
 
-1. **Which banks will people bring?** SF2 only, or also SFZ (large, needs conversion)? Will they bring their own mechanics or only pianos?
-2. **Import or play from the drive?** The plan assumes import (copy to the card). Is that acceptable, or must the drive stay plugged in?
-3. **Which filesystems** are on the flash drives you have in mind (FAT32, exFAT, NTFS, ext4)?
-4. **Switching:** only from the web page, or also with a button on the device? Is ~45 s per switch acceptable, or do you want fast switching
-   between a few banks (that needs more RAM than a Pi 3 has)?
-5. **Auto-import** the moment a drive is plugged in, or always ask in the page first (the plan: ask)?
-6. **How much hardening now?** The web service runs as root today. Do it in this feature (phase 4) or later?
+| # | Question | Decision |
+|---|---|---|
+| 1 | Which banks? | **SF2 only** (SF3 comes for free). SFZ is out of scope. The mechanics bank stays ours (`mech.sf2`); imported banks are pianos |
+| 2 | Import or play from the drive? | **Import**: copy to the card, then the drive can be removed |
+| 3 | Filesystems | *Not answered, assumed:* FAT32 and exFAT (ext4 comes free); NTFS only if it turns out to be needed |
+| 4 | Switching | **Only from the web page** for now (no hardware button) |
+| 5 | Auto-import | **Ask first**: nothing is copied until the owner presses Import on the page |
+| 6 | Hardening (no root) | *Not answered, assumed:* later, as phase 4 of this feature; phases 1 to 3 do not depend on it |
+
+What this changes in the plan: phase 5 shrinks (no SFZ, no auto-import); phase 4 stays but is not a blocker; phase 3 has no hardware-button path.
+
+## Next step
+
+Phase 0 on the real Pi (read-only checks and one measurement, see above), in parallel with phase 1 (bank library and SF2 reader),
+which needs no hardware and can be built and tested on the Mac.
