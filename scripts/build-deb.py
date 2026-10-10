@@ -142,7 +142,7 @@ def build_package(out_dir, name, version, depends, description, files, extra_dir
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--version', default='1.0.0')
+    ap.add_argument('--version', default='1.1.0')
     ap.add_argument('--out', default=src('dist'))
     ap.add_argument('--banks', nargs=2, metavar=('PIANO_SF2', 'MECH_SF2'))
     args = ap.parse_args()

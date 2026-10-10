@@ -110,11 +110,11 @@ cd /root/pi
 Те же службы, конфигурация и зависимости, но обычным пакетом Debian/DietPi:
 
 ```bash
-python3 scripts/build-deb.py --version 1.0.0                                # -> dist/piano-synth_1.0.0_all.deb
-python3 scripts/build-deb.py --version 1.0.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.0.0_all.deb
+python3 scripts/build-deb.py --version 1.1.0                                # -> dist/piano-synth_1.1.0_all.deb
+python3 scripts/build-deb.py --version 1.1.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.1.0_all.deb
 scp -O dist/*.deb root@<IP-Pi>:/root/
-ssh root@<IP-Pi> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-soundfonts_1.0.0_all.deb"
+ssh root@<IP-Pi> "apt install -y ./piano-synth_1.1.0_all.deb ./piano-synth-soundfonts_1.1.0_all.deb"
 ```
 
 - `piano-synth` — программа, две службы, `/etc/piano-synth.conf` (conffile: ваши правки при обновлении сохраняются),
@@ -126,7 +126,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-sound
 
 Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
 (`tests/test_deb.py`), но установка на реальной Pi и проверка самим `dpkg` на момент написания не выполнялись.
-На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.0.0_all.deb && dpkg-deb --contents piano-synth_1.0.0_all.deb`.
+На Pi можно сначала посмотреть: `dpkg-deb --info piano-synth_1.1.0_all.deb && dpkg-deb --contents piano-synth_1.1.0_all.deb`.
 
 ## Питание (читать обязательно)
 

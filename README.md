@@ -112,11 +112,11 @@ Loading the banks takes tens of seconds. Running it again is safe: the configura
 The same services, configuration and dependencies, as an ordinary Debian/DietPi package:
 
 ```bash
-python3 scripts/build-deb.py --version 1.0.0                                # -> dist/piano-synth_1.0.0_all.deb
-python3 scripts/build-deb.py --version 1.0.0 --banks build/piano-standard.sf2 build/mech.sf2
-                                                                            # + dist/piano-synth-soundfonts_1.0.0_all.deb
+python3 scripts/build-deb.py --version 1.1.0                                # -> dist/piano-synth_1.1.0_all.deb
+python3 scripts/build-deb.py --version 1.1.0 --banks build/piano-standard.sf2 build/mech.sf2
+                                                                            # + dist/piano-synth-soundfonts_1.1.0_all.deb
 scp -O dist/*.deb root@<Pi-IP>:/root/
-ssh root@<Pi-IP> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-soundfonts_1.0.0_all.deb"
+ssh root@<Pi-IP> "apt install -y ./piano-synth_1.1.0_all.deb ./piano-synth-soundfonts_1.1.0_all.deb"
 ```
 
 - `piano-synth` - the program, two services, `/etc/piano-synth.conf` (a conffile: your edits survive upgrades),
@@ -130,7 +130,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-sound
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
 (`tests/test_deb.py`), but, at the time of writing, installing on a real Pi and checking with `dpkg` itself have not been
 done. You can first inspect a package on the Pi:
-`dpkg-deb --info piano-synth_1.0.0_all.deb && dpkg-deb --contents piano-synth_1.0.0_all.deb`.
+`dpkg-deb --info piano-synth_1.1.0_all.deb && dpkg-deb --contents piano-synth_1.1.0_all.deb`.
 
 ## Power supply (read this)
 
