@@ -17,7 +17,7 @@ USB MIDI-клавиатура ─► piano-fx.py ─► FluidSynth ─► зву
 
 ## Проверено на
 
-- Raspberry Pi 3 Model B (1 ГБ), DietPi (Debian, FluidSynth 2.4.4), клавиатура Native Instruments KL Essential 49 mk3,
+- Raspberry Pi 3 Model B (1 ГБ), DietPi (Debian, FluidSynth 2.4.4), клавиатура Arturia KeyLab Essential 49 mk3,
   штатный выход 3.5 мм;
 - сборка банков — на macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 

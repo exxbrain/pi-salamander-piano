@@ -18,7 +18,7 @@ was tested on a Pi.
 
 ## Tested on
 
-- Raspberry Pi 3 Model B (1 GB), DietPi (Debian, FluidSynth 2.4.4), Native Instruments KL Essential 49 mk3 keyboard,
+- Raspberry Pi 3 Model B (1 GB), DietPi (Debian, FluidSynth 2.4.4), Arturia KeyLab Essential 49 mk3 keyboard,
   onboard 3.5 mm output;
 - building the banks: macOS (Apple Silicon), FluidSynth 2.6.1, ffmpeg.
 
