@@ -39,6 +39,7 @@ apt-get install -y fluidsynth alsa-utils python3-mido python3-rtmidi
 echo "==> Files in $PREFIX"
 install -d "$PREFIX/soundfonts"
 install -m 755 "$HERE/piano-fx.py" "$PREFIX/piano-fx.py"
+install -m 755 "$HERE/piano-synth-run" "$PREFIX/piano-synth-run"
 [ -n "$PIANO" ] && install -m 644 "$PIANO" "$PREFIX/soundfonts/piano.sf2"
 [ -n "$MECH" ]  && install -m 644 "$MECH"  "$PREFIX/soundfonts/mech.sf2"
 
@@ -62,6 +63,8 @@ done
 pkill -x fluidsynth 2>/dev/null || true
 install -m 644 "$HERE/piano-synth.service" /etc/systemd/system/piano-synth.service
 install -m 644 "$HERE/piano-fx.service"    /etc/systemd/system/piano-fx.service
+install -m 644 "$HERE/90-piano-synth.rules" /etc/udev/rules.d/90-piano-synth.rules
+udevadm control --reload 2>/dev/null || true
 systemctl daemon-reload
 systemctl enable piano-synth piano-fx
 systemctl restart piano-synth

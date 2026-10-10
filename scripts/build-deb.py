@@ -156,6 +156,8 @@ def main():
 
     main_files = [
         ('opt/piano-synth/piano-fx.py', src('pi', 'piano-fx.py'), 0o755),
+        ('opt/piano-synth/piano-synth-run', src('pi', 'piano-synth-run'), 0o755),
+        ('lib/udev/rules.d/90-piano-synth.rules', src('pi', '90-piano-synth.rules'), 0o644),
         ('etc/piano-synth.conf', src('pi', 'piano-synth.conf'), 0o644),
         ('lib/systemd/system/piano-synth.service', src('pi', 'piano-synth.service'), 0o644),
         ('lib/systemd/system/piano-fx.service', src('pi', 'piano-fx.service'), 0o644),

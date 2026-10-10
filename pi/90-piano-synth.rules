@@ -1,0 +1,10 @@
+# Re-pick the audio output when a USB sound card is plugged in or removed.
+# (the piano-fx bridge rescans the MIDI ports by itself and reconnects)
+#
+# UNTESTED on real hardware: written from the udev documentation. If it misbehaves, delete this file and run
+# `sudo systemctl restart piano-synth` after plugging or unplugging the interface.
+#
+# add: the parent chain in sysfs is still there, so match the USB parent.
+ACTION=="add", SUBSYSTEM=="sound", KERNEL=="card*", SUBSYSTEMS=="usb", RUN+="/bin/systemctl --no-block try-restart piano-synth.service"
+# remove: sysfs is already gone, so rely on the path id stored in the udev database (e.g. platform-...usb-usb-0:1.4:1.0).
+ACTION=="remove", SUBSYSTEM=="sound", KERNEL=="card*", ENV{ID_PATH}=="*usb*", RUN+="/bin/systemctl --no-block try-restart piano-synth.service"

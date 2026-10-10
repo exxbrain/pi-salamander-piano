@@ -101,7 +101,8 @@ cd /root/pi
 ./install.sh --piano /root/piano-standard.sf2 --mech /root/mech.sf2 --gain 1.0
 ```
 
-For a USB sound card add `--device hw:1` (the card number from `aplay -l`). The script installs the packages
+The audio output is chosen automatically: a USB sound card if one is plugged in, otherwise the onboard jack (to force one, add
+`--device plughw:Headphones` or `--device plughw:<card id from aplay -l>`). The script installs the packages
 (`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`), puts the files in `/opt/piano-synth`,
 writes the settings to `/etc/piano-synth.conf` and enables two services: `piano-synth` (FluidSynth) and `piano-fx` (the bridge).
 Loading the banks takes tens of seconds. Running it again is safe: the configuration is not overwritten.
@@ -123,7 +124,7 @@ ssh root@<Pi-IP> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-sound
   If services of a manual setup (`fluidsynth-live`, `midi-autoconnect`) are left on the Pi, the package disables them.
 - `piano-synth-soundfonts` - the banks (`piano.sf2`, `mech.sf2`) in `/opt/piano-synth/soundfonts`. They are hundreds of
   megabytes; instead you can copy the files and run
-  `sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 1.0]`.
+  `sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device plughw:U24] [--gain 1.0]`.
 - Removal: `apt remove piano-synth` (the services stop and are disabled); `apt purge` also deletes the configuration.
 
 The packages are built without `dpkg-deb` (pure Python), so building works on a Mac. Their structure is covered by tests
@@ -148,7 +149,14 @@ and a short, thick cable** (up to 1 m, 20 AWG wires or thicker, no switch). A lo
 - **Onboard 3.5 mm:** enable `dtparam=audio=on` in `/boot/config.txt` (DietPi: `dietpi-config` -> Audio Options), device
   `plughw:Headphones`. The bcm2835 driver enlarges the buffer period to 444 samples by itself, so the latency is about
   30 ms (with `PERIODS=3`); `PERIODS=2` gives ~20 ms but may click. The output is somewhat noisy.
-- **USB sound card:** the best option. Device `hw:1`, `PERIOD_SIZE=64..128`; the latency is expected to be several times lower.
+- **USB sound card / audio interface:** the best option. Just plug it in: `ALSA_DEVICE=auto` (the default) prefers a USB card and
+  uses the smaller buffer `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (~12 ms). The device is opened through ALSA's `plughw` layer, which
+  matters: many interfaces accept only 24/32-bit audio or 4 channels, and opening them directly (`hw:`) fails with
+  `Failed to find an audio format supported by alsa`.
+  Tested: a Zoom U-24 (it reports `S32_LE`, 4 channels, 44.1-96 kHz) on a Pi 3 with `64 x 3`: no clicks by ear, latency not
+  measured. The card is picked when the service starts (it waits `USB_WAIT` seconds for a USB card at boot). Re-picking when you
+  plug or unplug a card is done by a udev rule that was written from the documentation and **not tested on hardware**;
+  if it does not work, run `sudo systemctl restart piano-synth` after changing the interface.
 
 ## Configuration
 
@@ -158,7 +166,8 @@ Everything is in `/etc/piano-synth.conf`. After editing: `sudo systemctl restart
 |---|---|
 | `GAIN` | overall volume (0.2 is FluidSynth's own default; these banks want 1.0, the mono preset `small` wants 2.0) |
 | `POLYPHONY` | number of voices; stereo uses two voices per note, and the mechanics add more |
-| `ALSA_DEVICE`, `PERIOD_SIZE`, `PERIODS` | audio output and buffer |
+| `ALSA_DEVICE` | `auto` (USB card if present, otherwise onboard) or an explicit device such as `plughw:U24` |
+| `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | buffer for the onboard output / for a USB card, and how long to wait for it at boot |
 | `REVERB` | 1 enables FluidSynth's reverb (higher CPU load) |
 | `FX_ARGS` | mechanics options, see below |
 

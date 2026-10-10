@@ -120,7 +120,11 @@ class DebTests(unittest.TestCase):
         data = self.tar(self.members(self.main)[2][1])
         synth = data.extractfile('./lib/systemd/system/piano-synth.service').read().decode()
         self.assertIn('EnvironmentFile=/etc/piano-synth.conf', synth)
-        self.assertIn('fluidsynth -is ', synth)
+        self.assertIn('ExecStart=/opt/piano-synth/piano-synth-run', synth)
+        runner = data.extractfile('./opt/piano-synth/piano-synth-run').read().decode()
+        self.assertIn('-is ', runner)                       # server mode: FluidSynth must not exit by itself
+        self.assertEqual(data.getmember('./opt/piano-synth/piano-synth-run').mode, 0o755)
+        self.assertIn('./lib/udev/rules.d/90-piano-synth.rules', [m.name for m in data.getmembers()])
 
     def test_soundfonts_package(self):
         m = self.members(self.fonts)

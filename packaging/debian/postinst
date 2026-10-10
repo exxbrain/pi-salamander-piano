@@ -3,6 +3,7 @@ set -e
 
 case "$1" in
 configure)
+    udevadm control --reload >/dev/null 2>&1 || true
     if [ -d /run/systemd/system ]; then
         # services of earlier manual setups compete for the sound card and the MIDI ports
         for old in fluidsynth-live midi-autoconnect; do

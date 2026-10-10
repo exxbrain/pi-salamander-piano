@@ -1,0 +1,62 @@
+#!/bin/bash
+# Picks the audio output and starts FluidSynth. Used by piano-synth.service (settings come from /etc/piano-synth.conf).
+#
+# ALSA_DEVICE=auto (default): prefer a USB audio card (small buffer), otherwise the onboard 3.5 mm output.
+# Any other value is used as it is (for example plughw:U24). USB cards often accept only 24/32-bit audio or 4 channels,
+# so the automatic choice always goes through the "plughw" layer, which converts format, rate and channels.
+#
+# For tests: ASOUND_DIR points to a fake /proc/asound, DRY_RUN=1 prints the command instead of running it.
+set -euo pipefail
+
+ASOUND="${ASOUND_DIR:-/proc/asound}"
+ALSA_DEVICE="${ALSA_DEVICE:-auto}"
+PERIOD_SIZE="${PERIOD_SIZE:-256}"
+PERIODS="${PERIODS:-3}"
+USB_PERIOD_SIZE="${USB_PERIOD_SIZE:-64}"
+USB_PERIODS="${USB_PERIODS:-3}"
+USB_WAIT="${USB_WAIT:-8}"          # seconds to wait for a USB card to appear at boot
+POLYPHONY="${POLYPHONY:-128}"
+GAIN="${GAIN:-1.0}"
+REVERB="${REVERB:-0}"
+FLUIDSYNTH="${FLUIDSYNTH:-/usr/bin/fluidsynth}"
+
+# prints "<card id> <usb|onboard|other>" for the best card, or nothing
+pick_card() {
+  local usb="" onboard="" other="" num id
+  [ -r "$ASOUND/cards" ] || return 0
+  while read -r num id; do
+    id="${id%% *}"
+    if [ -e "$ASOUND/card$num/usbid" ]; then
+      [ -n "$usb" ] || usb="$id"
+    elif [[ "$id" == Headphones* ]]; then
+      [ -n "$onboard" ] || onboard="$id"
+    elif [[ ! "$id" =~ [Hh][Dd][Mm][Ii] ]]; then
+      [ -n "$other" ] || other="$id"
+    fi
+  done < <(sed -n 's/^ *\([0-9][0-9]*\) \[\([^]]*\)\].*/\1 \2/p' "$ASOUND/cards")
+  if   [ -n "$usb" ];     then echo "$usb usb"
+  elif [ -n "$onboard" ]; then echo "$onboard onboard"
+  elif [ -n "$other" ];   then echo "$other other"
+  fi
+}
+
+DEVICE="$ALSA_DEVICE"
+Z="$PERIOD_SIZE"; C="$PERIODS"
+if [ "$ALSA_DEVICE" = auto ]; then
+  choice="$(pick_card)"
+  waited=0
+  while [ "${choice##* }" != usb ] && [ "$waited" -lt "$USB_WAIT" ]; do   # a USB card enumerates late at boot
+    sleep 1; waited=$((waited + 1)); choice="$(pick_card)"
+  done
+  [ -n "$choice" ] || { echo "piano-synth: no sound card found" >&2; exit 1; }
+  DEVICE="plughw:CARD=${choice%% *}"
+  if [ "${choice##* }" = usb ]; then Z="$USB_PERIOD_SIZE"; C="$USB_PERIODS"; fi
+  echo "piano-synth: audio output $DEVICE (${choice##* }), period $Z x $C" >&2
+fi
+
+cmd=("$FLUIDSYNTH" -is -a alsa -m alsa_seq
+     -o "audio.alsa.device=$DEVICE" -o audio.sample-format=16bits -r 44100
+     -z "$Z" -c "$C" -R "$REVERB" -C 0 -o "synth.polyphony=$POLYPHONY" -g "$GAIN"
+     "${PIANO_SF2:?PIANO_SF2 is not set}" "${MECH_SF2:?MECH_SF2 is not set}")
+if [ "${DRY_RUN:-0}" = 1 ]; then echo "${cmd[*]}"; exit 0; fi
+exec "${cmd[@]}"

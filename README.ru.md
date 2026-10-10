@@ -99,7 +99,8 @@ cd /root/pi
 ./install.sh --piano /root/piano-standard.sf2 --mech /root/mech.sf2 --gain 1.0
 ```
 
-Для USB-карты добавьте `--device hw:1` (номер карты из `aplay -l`). Скрипт ставит пакеты
+Звуковой выход выбирается автоматически: USB-карта, если она подключена, иначе штатный jack (чтобы задать явно, добавьте
+`--device plughw:Headphones` или `--device plughw:<id карты из aplay -l>`). Скрипт ставит пакеты
 (`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`), раскладывает файлы в `/opt/piano-synth`,
 пишет настройки в `/etc/piano-synth.conf` и включает две службы: `piano-synth` (FluidSynth) и `piano-fx` (мост).
 Загрузка банков занимает десятки секунд. Повторный запуск безопасен: конфигурация не затирается.
@@ -120,7 +121,7 @@ ssh root@<IP-Pi> "apt install -y ./piano-synth_1.0.0_all.deb ./piano-synth-sound
   зависимости (`fluidsynth`, `alsa-utils`, `python3-mido`, `python3-rtmidi`), команда `piano-synth-install-banks`.
   Если на Pi остались службы ручной установки (`fluidsynth-live`, `midi-autoconnect`), пакет их отключает.
 - `piano-synth-soundfonts` — банки (`piano.sf2`, `mech.sf2`) в `/opt/piano-synth/soundfonts`. Это сотни мегабайт; можно вместо
-  него копировать файлы и вызвать `sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device hw:1] [--gain 1.0]`.
+  него копировать файлы и вызвать `sudo piano-synth-install-banks --piano piano.sf2 --mech mech.sf2 [--device plughw:U24] [--gain 1.0]`.
 - Удаление: `apt remove piano-synth` (службы остановятся и отключатся), `apt purge` дополнительно удалит конфигурацию.
 
 Пакеты собираются без `dpkg-deb` (чистый Python), поэтому сборка работает на Mac. Структура проверена тестами
@@ -145,7 +146,14 @@ vcgencmd get_throttled     # должно быть 0x0
 - **Штатный 3.5 мм:** включить `dtparam=audio=on` в `/boot/config.txt` (DietPi: `dietpi-config` → Audio Options),
   устройство `plughw:Headphones`. Драйвер bcm2835 сам увеличивает период буфера до 444 сэмплов, поэтому задержка
   около 30 мс (при `PERIODS=3`); `PERIODS=2` даёт ~20 мс, но возможны щелчки. Выход шумноват.
-- **USB-звуковая карта:** лучшее решение. Устройство `hw:1`, `PERIOD_SIZE=64..128`, ожидаемая задержка в несколько раз ниже.
+- **USB-звуковая карта / аудиоинтерфейс:** лучшее решение. Просто подключите: `ALSA_DEVICE=auto` (по умолчанию) предпочитает USB-карту и
+  использует меньший буфер `USB_PERIOD_SIZE=64` x `USB_PERIODS=3` (~12 мс). Устройство открывается через слой ALSA `plughw`, и это
+  важно: многие интерфейсы принимают только 24/32 бита или 4 канала, и прямое открытие (`hw:`) падает с ошибкой
+  `Failed to find an audio format supported by alsa`.
+  Проверено: Zoom U-24 (показывает `S32_LE`, 4 канала, 44.1-96 кГц) на Pi 3 с `64 x 3`: на слух без щелчков, задержка не измерялась.
+  Карта выбирается при запуске службы (на загрузке служба ждёт USB-карту `USB_WAIT` секунд). Повторный выбор при подключении и
+  отключении карты делает правило udev, написанное по документации и **не проверенное на железе**; если не сработает, выполните
+  `sudo systemctl restart piano-synth` после смены интерфейса.
 
 ## Настройка
 
@@ -155,7 +163,8 @@ vcgencmd get_throttled     # должно быть 0x0
 |---|---|
 | `GAIN` | общая громкость (0.2 — значение FluidSynth по умолчанию, у этих банков 1.0; моно-пресет `small` — 2.0) |
 | `POLYPHONY` | число голосов; стерео — по два голоса на ноту, механика добавляет ещё |
-| `ALSA_DEVICE`, `PERIOD_SIZE`, `PERIODS` | звуковой выход и буфер |
+| `ALSA_DEVICE` | `auto` (USB-карта, если есть, иначе штатный выход) или явное устройство, например `plughw:U24` |
+| `PERIOD_SIZE`, `PERIODS` / `USB_PERIOD_SIZE`, `USB_PERIODS`, `USB_WAIT` | буфер для штатного выхода / для USB-карты и сколько ждать её при загрузке |
 | `REVERB` | 1 — включить реверберацию FluidSynth (нагрузка на CPU выше) |
 | `FX_ARGS` | параметры механики, см. ниже |
 

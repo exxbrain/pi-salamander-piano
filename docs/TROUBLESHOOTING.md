@@ -28,6 +28,8 @@ The `piano-fx` log should contain lines like `synth: FLUID Synth ...` and `input
 | The keyboard plays but there are no mechanics | `mech.sf2` is not loaded (check `MECH_SF2` in `/etc/piano-synth.conf`) or `piano-fx` is not running |
 | There is sound but it is very quiet | Raise `GAIN` (1.0 for stereo, 2.0 for the mono `small`) and the ALSA volume (`alsamixer`, F6, Headphones ~90%) |
 | Chords sound harsh or distorted | `GAIN` is too high, lower it |
+| The log says `Failed to find an audio format supported by alsa` | The card was opened directly (`hw:...`) and does not accept 16-bit stereo (USB interfaces often offer only 32-bit / 4 channels). Use the `plughw:` form or leave `ALSA_DEVICE=auto` |
+| The sound comes from the wrong output after plugging or unplugging a USB card | Run `sudo systemctl restart piano-synth` (the automatic udev restart is untested), or set `ALSA_DEVICE` explicitly |
 
 ## Clicks and latency
 
