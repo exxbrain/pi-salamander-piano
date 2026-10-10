@@ -132,6 +132,27 @@ The packages are built without `dpkg-deb` (pure Python), so building works on a 
 done. You can first inspect a package on the Pi:
 `dpkg-deb --info piano-synth_1.1.0_all.deb && dpkg-deb --contents piano-synth_1.1.0_all.deb`.
 
+## DietPi installer (built on every commit)
+
+`piano-synth-dietpi-<version>.zip` (or `.tar.gz`) installs everything on DietPi, on a fresh card or a running system:
+
+1. Flash DietPi, then copy the contents of `boot-partition/` to the card's boot partition (`Automation_Custom_Script.sh` at the top,
+   the `piano-synth/` folder next to it). Optionally put `piano.sf2` and `mech.sf2` into `piano-synth/banks/`.
+2. In `dietpi.txt` set `AUTO_SETUP_AUTOMATED=1` and `AUTO_SETUP_CUSTOM_SCRIPT_EXEC=0` (and your network; use Ethernet, the installer
+   downloads the packages).
+3. Boot. The installer's log is `/var/log/piano-synth-install.log`; then open `http://<device>:8080/`.
+
+On a DietPi that is already running: copy `piano-synth/` to it and run `sudo bash piano-synth/install-piano.sh`.
+
+**Where the installer comes from.** Locally, `scripts/install-hooks.sh` (run once) enables a git hook: every `git commit` runs the tests and
+builds `dist/` (the `.deb` and the DietPi installer). On GitHub, `.github/workflows/build.yml` does the same for every push and pull request
+and keeps the files as a downloadable artifact; a tag such as `v1.2.0` (it must equal the `VERSION` file) publishes them as a release.
+Change the version in the `VERSION` file only: the package, the installer and the web page all take it from there.
+
+What is and is not verified: the installer script is tested by running it with fake `apt-get` and friends, and the bundle's structure is
+tested. The first-boot hook (`AUTO_SETUP_CUSTOM_SCRIPT_EXEC`) is written from DietPi's documentation and has not been tried on a real first
+boot. The GitHub workflow has not run yet: the first push shows whether it works (Actions tab).
+
 ## Power supply (read this)
 
 The Pi 3 is very sensitive to its power. Check:

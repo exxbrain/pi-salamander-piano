@@ -142,7 +142,7 @@ def build_package(out_dir, name, version, depends, description, files, extra_dir
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--version', default='1.1.0')
+    ap.add_argument('--version', default=read(src('VERSION')).decode().strip(), help='default: the VERSION file')
     ap.add_argument('--out', default=src('dist'))
     ap.add_argument('--banks', nargs=2, metavar=('PIANO_SF2', 'MECH_SF2'))
     args = ap.parse_args()
@@ -156,6 +156,7 @@ def main():
 
     main_files = [
         ('opt/piano-synth/piano-fx.py', src('pi', 'piano-fx.py'), 0o755),
+        ('opt/piano-synth/VERSION', (args.version + '\n').encode(), 0o644),
         ('opt/piano-synth/piano-synth-run', src('pi', 'piano-synth-run'), 0o755),
         ('opt/piano-synth/pianoconf.py', src('pi', 'pianoconf.py'), 0o644),
         ('opt/piano-synth/piano-web.py', src('pi', 'piano-web.py'), 0o755),

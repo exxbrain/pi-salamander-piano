@@ -45,6 +45,12 @@ class FakeActions:
         self.gains.append(value)
         return self.gain_ok
 
+    def version(self):
+        return '9.9.9'
+
+    def fluidsynth_version(self):
+        return '2.4.4'
+
     def cards(self):
         return [dict(id='U24', name='U-24', usb=True), dict(id='Headphones', name='bcm2835 Headphones', usb=False)]
 
@@ -100,6 +106,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(s['settings']['velocity_curve'], 1.0)
         self.assertEqual(s['spec']['gain']['scope'], 'gain')
         self.assertEqual((s['spec']['velocity_curve']['lo'], s['spec']['velocity_curve']['hi']), (0.4, 2.5))
+        self.assertEqual((s['version'], s['fluidsynth']), ('9.9.9', '2.4.4'))
         self.assertEqual(s['status']['synth'], 'active')
         self.assertEqual(s['status']['output']['device'], 'plughw:CARD=U24')
         self.assertEqual([c['id'] for c in s['status']['cards']], ['U24', 'Headphones'])

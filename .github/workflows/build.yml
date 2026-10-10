@@ -1,0 +1,49 @@
+name: build
+
+# Every push and pull request: run the tests and build the package and the DietPi installer.
+# A tag like v1.2.0 also publishes them as a GitHub release.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write   # needed only to attach files to a release on tags
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg (the builder tests use it)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: The tag must match the VERSION file
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "v$(cat VERSION)" = "${GITHUB_REF_NAME}"
+
+      - name: Build the package and the DietPi installer
+        run: |
+          python3 scripts/build-deb.py
+          python3 scripts/build-dietpi-installer.py
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: piano-synth-dietpi-installer
+          path: |
+            dist/*.deb
+            dist/piano-synth-dietpi-*.zip
+            dist/piano-synth-dietpi-*.tar.gz
+
+      - name: Publish a release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.deb
+            dist/piano-synth-dietpi-*.zip
+            dist/piano-synth-dietpi-*.tar.gz

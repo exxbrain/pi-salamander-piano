@@ -39,6 +39,7 @@ apt-get install -y fluidsynth alsa-utils python3-mido python3-rtmidi
 echo "==> Files in $PREFIX"
 install -d "$PREFIX/soundfonts"
 install -m 755 "$HERE/piano-fx.py" "$PREFIX/piano-fx.py"
+[ -f "$HERE/../VERSION" ] && install -m 644 "$HERE/../VERSION" "$PREFIX/VERSION"
 install -m 755 "$HERE/piano-synth-run" "$PREFIX/piano-synth-run"
 install -m 644 "$HERE/pianoconf.py" "$PREFIX/pianoconf.py"
 install -m 755 "$HERE/piano-web.py" "$PREFIX/piano-web.py"

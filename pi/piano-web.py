@@ -30,6 +30,27 @@ class Actions:
     def __init__(self, asound=None):
         self.asound = asound or os.environ.get('ASOUND_DIR', '/proc/asound')
 
+    def version(self):
+        """Installed package version: VERSION next to the program (installed) or in the repository root."""
+        here = os.path.dirname(os.path.abspath(__file__))
+        for path in (os.path.join(here, 'VERSION'), os.path.join(here, '..', 'VERSION')):
+            try:
+                with open(path, encoding='utf-8') as f:
+                    text = f.read().strip()
+                    if text:
+                        return text
+            except OSError:
+                pass
+        return None
+
+    def fluidsynth_version(self):
+        try:
+            r = subprocess.run(['fluidsynth', '--version'], capture_output=True, text=True, timeout=3)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        m = re.search(r'version (\S+)', r.stdout)
+        return m.group(1) if m else None
+
     def service_state(self, unit):
         try:
             r = subprocess.run(['systemctl', 'is-active', unit], capture_output=True, text=True, timeout=3)
@@ -105,6 +126,8 @@ class App:
     def state(self):
         a = self.actions
         return dict(
+            version=a.version(),
+            fluidsynth=a.fluidsynth_version(),
             settings=pianoconf.get_settings(self.conf_path),
             spec=self.spec(),
             status=dict(synth=a.service_state('piano-synth'), bridge=a.service_state('piano-fx'),

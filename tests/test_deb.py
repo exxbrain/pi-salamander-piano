@@ -126,6 +126,7 @@ class DebTests(unittest.TestCase):
         self.assertNotIn('shell.port', runner)
         self.assertEqual(data.getmember('./opt/piano-synth/piano-synth-run').mode, 0o755)
         names = [m.name for m in data.getmembers()]
+        self.assertEqual(data.extractfile('./opt/piano-synth/VERSION').read().decode().strip(), '9.9.9')
         self.assertIn('./lib/udev/rules.d/90-piano-synth.rules', names)
         for web_file in ('./opt/piano-synth/pianoconf.py', './opt/piano-synth/piano-web.py',
                          './opt/piano-synth/web/index.html', './lib/systemd/system/piano-web.service'):
